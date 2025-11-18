@@ -3,13 +3,22 @@
 	"version": "0.0.0",
 	"private": true,
 	"scripts": {
+		"migrate": "dotenv -e .dev.vars -- npx prisma migrate dev",
+		"generate": "dotenv -e .dev.vars -- npx prisma generate --no-engine",
+		"studio": "dotenv -e .dev.vars -- npx prisma studio",
 		"deploy": "wrangler deploy",
 		"dev": "wrangler dev",
 		"start": "wrangler dev",
 		"cf-typegen": "wrangler types"
 	},
 	"devDependencies": {
+		"@types/node": "^24.10.1",
+		"dotenv-cli": "^11.0.0",
+		"prisma": "^6.19.0",
 		"typescript": "^5.5.2",
 		"wrangler": "^4.47.0"
+	},
+	"dependencies": {
+		"@prisma/extension-accelerate": "^2.0.2"
 	}
 }

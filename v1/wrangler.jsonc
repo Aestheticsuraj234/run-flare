@@ -7,6 +7,9 @@
 	"name": "v1",
 	"main": "src/index.ts",
 	"compatibility_date": "2025-11-18",
+	"compatibility_flags": [
+		"nodejs_compat"
+	],
 	"migrations": [
 		{
 			"new_sqlite_classes": [

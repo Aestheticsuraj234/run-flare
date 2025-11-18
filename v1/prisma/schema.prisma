@@ -1,0 +1,95 @@
+
+generator client {
+  provider = "prisma-client-js"
+
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+
+model User {
+  id          String           @id @default(cuid())
+  email       String        @unique
+  submissions Submission[]
+}
+
+model Language {
+  id          Int           @id @default(autoincrement())
+  name        String   @unique
+  compileCmd  String?       
+  runCmd      String
+  sourceFile  String
+  isArchived  Boolean       @default(false)
+
+  submissions Submission[]
+}
+
+model Status {
+  id          Int           @id @default(autoincrement())
+  name        String
+  description String?
+  submissions Submission[]
+}
+
+model Submission {
+  id                   String        @id @default(cuid())
+  sourceCode           String? 
+  languageId           Int
+  stdin                String?
+  expectedOutput       String?
+  stdout               String?
+  statusId             Int
+  createdAt            DateTime   @default(now())
+  finishedAt           DateTime?
+  time                 Float?
+  memory               Int?
+  stderr               String?
+  token                String     @unique
+  numberOfRuns         Int        @default(1)
+  cpuTimeLimit         Float      @default(5.0)
+  cpuExtraTime         Float      @default(1.0)
+  wallTimeLimit        Float      @default(10.0)
+  memoryLimit          Int        @default(128000)
+  stackLimit           Int        @default(64000)
+  maxProcessesAndThreads Int      @default(60)
+  enablePerProcessTimeLimit   Boolean @default(true)
+  enablePerProcessMemoryLimit Boolean @default(true)
+  maxFileSize          Int        @default(1024)
+  compileOutput        String?
+  exitCode             Int?
+  exitSignal           Int?
+  message              String?
+  wallTime             Float?
+  compilerOptions      String?
+  commandLineArguments String?
+  redirectStderrToStdout Boolean  @default(false)
+  callbackUrl          String?
+  additionalFiles      Bytes?
+  enableNetwork        Boolean    @default(false)
+  startedAt            DateTime?
+  updatedAt            DateTime?
+  queuedAt             DateTime?
+  queueHost            String?
+  executionHost        String?
+
+  userId               String?
+  user                 User?      @relation(fields: [userId], references: [id])
+  language             Language   @relation(fields: [languageId], references: [id])
+  status               Status     @relation(fields: [statusId], references: [id])
+  result               Result?
+}
+
+model Result {
+  id           String        @id @default(cuid())
+  stdout       String?
+  stderr       String?
+  exitCode     Int?
+  startedAt    DateTime?
+  finishedAt   DateTime?
+  submissionId String        @unique
+  submission   Submission @relation(fields: [submissionId], references: [id])
+}
+
