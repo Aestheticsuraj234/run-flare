@@ -9,7 +9,8 @@
 		"deploy": "wrangler deploy",
 		"dev": "wrangler dev",
 		"start": "wrangler dev",
-		"cf-typegen": "wrangler types"
+		"cf-typegen": "wrangler types",
+		"seed": "dotenv -e .dev.vars -- tsx prisma/seed.ts"
 	},
 	"devDependencies": {
 		"@types/node": "^24.10.1",
@@ -19,6 +20,7 @@
 		"wrangler": "^4.47.0"
 	},
 	"dependencies": {
-		"@prisma/extension-accelerate": "^2.0.2"
+		"@prisma/extension-accelerate": "^2.0.2",
+		"tsx": "^4.20.6"
 	}
 }
