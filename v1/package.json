@@ -20,6 +20,7 @@
 		"wrangler": "^4.47.0"
 	},
 	"dependencies": {
+		"@cloudflare/sandbox": "^0.5.1",
 		"@prisma/extension-accelerate": "^2.0.2",
 		"tsx": "^4.20.6"
 	}
