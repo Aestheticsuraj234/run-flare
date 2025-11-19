@@ -8,9 +8,10 @@
 	],
 	"containers": [
 		{
+			"name": "run-flare-container-v1",
 			"class_name": "Sandbox",
 			"image": "./Dockerfile",
-			"instance_type": "lite",
+			"instance_type": "standard",
 			"max_instances": 1
 		}
 	],

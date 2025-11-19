@@ -20,9 +20,14 @@ export default {
 				// Get durable object instance for this submission
 				const id = env.SUBMISSION_EXECUTOR.idFromName(`executor-${data.submissionId}`);
 				const stub = env.SUBMISSION_EXECUTOR.get(id);
-
-				// Execute submission in durable object
-				await stub.fetch(new Request(data.url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) }));
+				// Execute submission in Durable Object
+				await stub.fetch(
+					new Request("http://internal/execute", {
+						method: "POST",
+						headers: { "Content-Type": "application/json" },
+						body: JSON.stringify(data),
+					})
+				);
 
 				message.ack();
 			} catch (error) {
