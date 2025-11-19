@@ -1,4 +1,3 @@
-import { DurableObject } from "cloudflare:workers";
 import { setupRoutes } from "./routes";
 import { SubmissionExecutor } from "./durableObjects/SubmissionExecutor";
 import { Sandbox } from "./durableObjects/Sandbox";
