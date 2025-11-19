@@ -1,36 +1,35 @@
 import { DurableObject } from "cloudflare:workers";
 import { setupRoutes } from "./routes";
+import { SubmissionExecutor } from "./durableObjects/SubmissionExecutor";
+import { Sandbox } from "./durableObjects/Sandbox";
 
-
-export class MyDurableObject extends DurableObject<Env> {
-	/**
-	 * The constructor is invoked once upon creation of the Durable Object, i.e. the first call to
-	 * 	`DurableObjectStub::get` for a given identifier (no-op constructors can be omitted)
-	 *
-	 * @param ctx - The interface for interacting with Durable Object state
-	 * @param env - The interface to reference bindings declared in wrangler.jsonc
-	 */
-	constructor(ctx: DurableObjectState, env: Env) {
-		super(ctx, env);
-	}
-
-	/**
-	 * The Durable Object exposes an RPC method sayHello which will be invoked when when a Durable
-	 *  Object instance receives a request from a Worker via the same method invocation on the stub
-	 *
-	 * @param name - The name provided to a Durable Object instance from a Worker
-	 * @returns The greeting to be sent back to the Worker
-	 */
-	async sayHello(name: string): Promise<string> {
-		return `Hello, ${name}!`;
-	}
-}
+export { SubmissionExecutor, Sandbox };
 
 export default {
 
 	async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
-    const router = setupRoutes(env);
-    const response = await router.handle(request, env, ctx);
-    return response ?? new Response("Not Found", { status: 404 });
-  },
+		const router = setupRoutes(env);
+		const response = await router.handle(request, env, ctx);
+		return response ?? new Response("Not Found", { status: 404 });
+	},
+
+	async queue(batch: MessageBatch<any>, env: Env): Promise<void> {
+		for (const message of batch.messages) {
+			try {
+				const data = message.body;
+
+				// Get durable object instance for this submission
+				const id = env.SUBMISSION_EXECUTOR.idFromName(`executor-${data.submissionId}`);
+				const stub = env.SUBMISSION_EXECUTOR.get(id);
+
+				// Execute submission in durable object
+				await stub.fetch(new Request(data.url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) }));
+
+				message.ack();
+			} catch (error) {
+				console.error("Queue processing error:", error);
+				message.retry()
+			}
+		}
+	}
 } satisfies ExportedHandler<Env>;
