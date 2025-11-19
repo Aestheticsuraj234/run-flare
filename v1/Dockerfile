@@ -14,8 +14,17 @@ RUN npm install -g typescript@5.3
 
 # Setup workspace directory
 RUN mkdir -p /workspace
+
+# Security: Create non-root user and restrict permissions
+RUN useradd -m -d /home/sandboxuser -s /bin/bash sandboxuser \
+    && chown -R sandboxuser:sandboxuser /workspace \
+    && chmod o-r /etc/passwd /etc/shadow
+
 WORKDIR /workspace
 
-# Add any additional environment config you need here
+# Switch to non-root user
+USER sandboxuser
+
+ENV TMPDIR=/workspace
 
 # Entrypoint is handled by Cloudflare sandbox runtime

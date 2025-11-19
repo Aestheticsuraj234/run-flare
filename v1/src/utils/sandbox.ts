@@ -31,7 +31,7 @@ export async function executeInSandbox(
   params: SandboxExecutionParams,
   sandboxBinding: DurableObjectNamespace<Sandbox>
 ): Promise<SandboxExecutionResult> {
-  const { submissionId, sourceCode, command, sourceFile, stdin = "", options } = params;
+  const { submissionId, sourceCode, command, sourceFile, stdin = "", options, limits } = params;
   const WORKSPACE_DIR = EXECUTION_CONFIG.workspace;
 
   const sandbox = getSandbox(sandboxBinding, `submission-${submissionId}`);
@@ -55,9 +55,25 @@ export async function executeInSandbox(
     }
   }
 
+  // Security: Sanitize arguments to prevent command injection
+  // We only allow alphanumeric characters, spaces, dashes, underscores, equals, dots, and slashes.
+  const sanitizeArg = (arg: string) => {
+    if (!arg) return "";
+    // Remove any character that is NOT allowed
+    // Allowed: a-z, A-Z, 0-9, space, -, _, =, ., /
+    return arg.replace(/[^a-zA-Z0-9 \-_=./]/g, "");
+  };
+
   const segments = [command?.trim()];
-  if (options?.compilerOptions) segments.push(options.compilerOptions.trim());
-  if (options?.commandLineArguments) segments.push(options.commandLineArguments.trim());
+
+  if (options?.compilerOptions) {
+    segments.push(sanitizeArg(options.compilerOptions.trim()));
+  }
+
+  if (options?.commandLineArguments) {
+    segments.push(sanitizeArg(options.commandLineArguments.trim()));
+  }
+
   const fullCommand = segments.filter(Boolean).join(" ");
 
   if (!fullCommand) {
@@ -74,26 +90,54 @@ export async function executeInSandbox(
   }
 
   try {
-    const runResult = await sandbox.exec(execCommand, { cwd: WORKSPACE_DIR });
+    // Security: Implement Wall Time Limit
+    const wallTimeLimitMs = (limits?.wallTimeLimit || 10) * 1000;
 
-    const stdout = runResult.stdout ?? "";
-    const stderr = runResult.stderr ?? "";
-    const duration = runResult.duration ?? 0;
-    const startedAt = runResult.timestamp ? new Date(runResult.timestamp) : new Date();
-    const finishedAt = new Date(startedAt.getTime() + duration);
+    // Create a timeout promise
+    let timeoutId: any;
+    const timeoutPromise = new Promise<SandboxExecutionResult>((resolve) => {
+      timeoutId = setTimeout(() => {
+        resolve({
+          stdout: "",
+          stderr: "Time Limit Exceeded",
+          exitCode: 124, // Standard timeout exit code
+          exitSignal: 9, // SIGKILL
+          time: wallTimeLimitMs,
+          memory: 0,
+          wallTime: wallTimeLimitMs,
+          timeLimitExceeded: true,
+          startedAt: new Date(),
+          finishedAt: new Date(),
+        });
+      }, wallTimeLimitMs);
+    });
 
-    return {
-      stdout,
-      stderr,
-      exitCode: typeof runResult.exitCode === "number" ? runResult.exitCode : 0,
-      exitSignal: null,
-      time: duration,
-      memory: 0,
-      wallTime: duration,
-      timeLimitExceeded: false,
-      startedAt,
-      finishedAt,
-    };
+    const executionPromise = sandbox.exec(execCommand, { cwd: WORKSPACE_DIR }).then((runResult) => {
+      clearTimeout(timeoutId);
+
+      const stdout = runResult.stdout ?? "";
+      const stderr = runResult.stderr ?? "";
+      const duration = runResult.duration ?? 0; // duration is usually in ms
+      const startedAt = runResult.timestamp ? new Date(runResult.timestamp) : new Date();
+      const finishedAt = new Date(startedAt.getTime() + duration);
+
+      return {
+        stdout,
+        stderr,
+        exitCode: typeof runResult.exitCode === "number" ? runResult.exitCode : 0,
+        exitSignal: null,
+        time: duration,
+        memory: 0,
+        wallTime: duration,
+        timeLimitExceeded: false,
+        startedAt,
+        finishedAt,
+      };
+    });
+
+    // Race execution against timeout
+    return await Promise.race([executionPromise, timeoutPromise]);
+
   } catch (error: any) {
     console.error("[Sandbox] Execution error:", error);
     return {
@@ -112,7 +156,7 @@ export async function executeInSandbox(
     if (stdinFilePath) {
       try {
         await sandbox.deleteFile(stdinFilePath);
-      } catch {}
+      } catch { }
     }
   }
 }
