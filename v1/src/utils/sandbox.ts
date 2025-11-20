@@ -26,6 +26,15 @@ export interface SandboxExecutionResult {
   finishedAt: Date;
 }
 
+// Security: Validate paths to prevent traversal attacks
+export function validatePath(path: string): void {
+  if (path.includes("..")) {
+    throw new Error(`Invalid path: ${path}. Path traversal is not allowed.`);
+  }
+  if (path.startsWith("/")) {
+    throw new Error(`Invalid path: ${path}. Absolute paths are not allowed.`);
+  }
+}
 
 export async function executeInSandbox(
   params: SandboxExecutionParams,
@@ -35,6 +44,15 @@ export async function executeInSandbox(
   const WORKSPACE_DIR = EXECUTION_CONFIG.workspace;
 
   const sandbox = getSandbox(sandboxBinding, `submission-${submissionId}`);
+
+  // Validate paths
+  validatePath(sourceFile);
+  if (options?.additionalFiles) {
+    for (const f of options.additionalFiles) {
+      validatePath(f.path);
+    }
+  }
+
   const filePath = `${WORKSPACE_DIR}/${sourceFile}`;
 
   await sandbox.writeFile(filePath, normalizeToUtf8String(sourceCode));
@@ -152,11 +170,7 @@ export async function executeInSandbox(
       startedAt: new Date(),
       finishedAt: new Date(),
     };
-  } finally {
-    if (stdinFilePath) {
-      try {
-        await sandbox.deleteFile(stdinFilePath);
-      } catch { }
-    }
-  }
+  } 
+ 
 }
+
