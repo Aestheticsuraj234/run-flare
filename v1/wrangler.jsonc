@@ -27,6 +27,12 @@
 				"SubmissionExecutor"
 			],
 			"tag": "v2"
+		},
+		{
+			"new_classes": [
+				"SubmissionWebSocket"
+			],
+			"tag": "v3"
 		}
 	],
 	"durable_objects": {
@@ -38,6 +44,10 @@
 			{
 				"class_name": "SubmissionExecutor",
 				"name": "SUBMISSION_EXECUTOR"
+			},
+			{
+				"class_name": "SubmissionWebSocket",
+				"name": "SUBMISSION_WEBSOCKET"
 			}
 		]
 	},

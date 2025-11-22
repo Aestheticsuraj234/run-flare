@@ -1,23 +1,32 @@
 import { setupRoutes } from "./routes";
 import { SubmissionExecutor } from "./durableObjects/SubmissionExecutor";
 import { Sandbox } from "./durableObjects/Sandbox";
+import { SubmissionWebSocket } from "./durableObjects/SubmissionWebSocket";
 
-export { SubmissionExecutor, Sandbox };
+export { SubmissionExecutor, Sandbox, SubmissionWebSocket };
 
 import { rateLimiter } from "./middleware/rateLimiter";
 import { errorHandler } from "./middleware/errorHandler";
+import { corsMiddleware, addCorsHeaders } from "./middleware/cors";
 
 export default {
 
 	async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
 		return errorHandler(request, async () => {
+			// Handle CORS preflight
+			const corsResponse = corsMiddleware(request);
+			if (corsResponse) return corsResponse;
+
 			// Rate Limiter
 			const rateLimitResponse = await rateLimiter(request, env);
-			if (rateLimitResponse) return rateLimitResponse;
+			if (rateLimitResponse) return addCorsHeaders(rateLimitResponse, request);
 
 			const router = setupRoutes(env);
 			const response = await router.handle(request, env, ctx);
-			return response ?? new Response("Not Found", { status: 404 });
+			const finalResponse = response ?? new Response("Not Found", { status: 404 });
+
+			// Add CORS headers to response
+			return addCorsHeaders(finalResponse, request);
 		});
 	},
 

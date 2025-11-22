@@ -21,3 +21,53 @@ export interface CreateSubmissionBody {
   additional_files?: string;  // base64 encoded string
   enable_network?: boolean;
 }
+
+// WebSocket Message Types
+export type WebSocketMessageType =
+  | 'status_update'
+  | 'progress_update'
+  | 'error'
+  | 'connected'
+  | 'ping'
+  | 'pong';
+
+export interface WebSocketMessage {
+  type: WebSocketMessageType;
+  timestamp: string;
+  token: string;
+}
+
+export interface WebSocketStatusUpdate extends WebSocketMessage {
+  type: 'status_update';
+  status: {
+    id: number;
+    name: string;
+    description: string;
+  };
+  data?: {
+    stdout?: string;
+    stderr?: string;
+    time?: string;
+    memory?: number;
+    compile_output?: string;
+    exit_code?: number;
+    message?: string;
+  };
+}
+
+export interface WebSocketProgressUpdate extends WebSocketMessage {
+  type: 'progress_update';
+  stage: 'compiling' | 'running' | 'evaluating';
+  message: string;
+}
+
+export interface WebSocketErrorMessage extends WebSocketMessage {
+  type: 'error';
+  error: string;
+  details?: string;
+}
+
+export interface WebSocketConnectedMessage extends WebSocketMessage {
+  type: 'connected';
+  message: string;
+}
