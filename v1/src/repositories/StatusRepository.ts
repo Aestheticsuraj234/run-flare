@@ -5,6 +5,7 @@ export class StatusRepository {
     return prisma.status.findMany({
       select: { id: true, name: true, description: true },
       orderBy: { id: "asc" },
+      cacheStrategy: { ttl: 60, swr: 300 },
     });
   }
 }

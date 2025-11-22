@@ -41,6 +41,12 @@
 			}
 		]
 	},
+	"kv_namespaces": [
+		{
+			"binding": "RATE_LIMITER",
+			"id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+		}
+	],
 	"queues": {
 		"producers": [
 			{
@@ -51,9 +57,9 @@
 		"consumers": [
 			{
 				"queue": "submission-execution-queue",
-				"max_batch_size": 10,
-				"max_batch_timeout": 5,
-				"max_retries": 2,
+				"max_batch_size": 20,
+				"max_batch_timeout": 10,
+				"max_retries": 3,
 				"dead_letter_queue": "submission-dlq"
 			}
 		]

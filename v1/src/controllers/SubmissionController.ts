@@ -1,8 +1,9 @@
 import { SubmissionService, ValidationError, NotFoundError } from "../services/SubmissionService";
-import { EXECUTION_TIMEOUTS } from "../config/limits";
+import { CreateSubmissionBody } from "../types/types";
+import { APP_CONFIG } from "../config/appConfig";
 
 export class SubmissionController {
-  constructor(private submissionService: SubmissionService) {}
+  constructor(private submissionService: SubmissionService) { }
 
   async create(request: Request, env: Env): Promise<Response> {
     try {
@@ -10,15 +11,15 @@ export class SubmissionController {
       const base64Encoded = url.searchParams.get("base64_encoded") === "true";
       const wait = url.searchParams.get("wait") === "true";
 
-      const body = await request.json();
+      const body = await request.json() as CreateSubmissionBody;
       const result = await this.submissionService.createSubmission(body, base64Encoded);
 
       if (wait) {
         const waitResult = await this.submissionService.waitForCompletion(
           result.token,
           base64Encoded,
-          EXECUTION_TIMEOUTS.maxWaitTime,
-          EXECUTION_TIMEOUTS.pollInterval
+          APP_CONFIG.TIMEOUTS.maxWaitTime,
+          APP_CONFIG.TIMEOUTS.pollInterval
         );
         if (waitResult) {
           return Response.json(waitResult, { status: 201 });
@@ -44,7 +45,74 @@ export class SubmissionController {
         base64Encoded
       );
 
-      return Response.json(submission);
+      const response = Response.json(submission);
+
+      // Cache finished submissions for 1 hour, don't cache pending ones
+      if (submission.status_id === 3 || submission.status_id >= 4) { // 3=Accepted, 4+=Error/Wrong Answer etc.
+        response.headers.set("Cache-Control", `public, max-age=${APP_CONFIG.CACHE.ttl}`);
+      } else {
+        response.headers.set("Cache-Control", "no-store");
+      }
+
+      return response;
+    } catch (error) {
+      return this.handleError(error);
+    }
+  }
+
+  async createBatch(request: Request, env: Env): Promise<Response> {
+    try {
+      const url = new URL(request.url);
+      const base64Encoded = url.searchParams.get("base64_encoded") === "true";
+
+      const body = await request.json() as { submissions: CreateSubmissionBody[] };
+
+      if (!body.submissions || !Array.isArray(body.submissions)) {
+        return Response.json({ error: "Invalid batch format. Expected { submissions: [...] }" }, { status: 400 });
+      }
+
+      if (body.submissions.length > APP_CONFIG.BATCH.maxSize) {
+        return Response.json({ error: `Batch size exceeds limit of ${APP_CONFIG.BATCH.maxSize}` }, { status: 400 });
+      }
+
+      const results = await Promise.all(
+        body.submissions.map(sub => this.submissionService.createSubmission(sub, base64Encoded))
+      );
+
+      return Response.json(results, { status: 201 });
+    } catch (error) {
+      return this.handleError(error);
+    }
+  }
+
+  async getBatch(request: Request, env: Env): Promise<Response> {
+    try {
+      const url = new URL(request.url);
+      const base64Encoded = url.searchParams.get("base64_encoded") === "true";
+      const tokensParam = url.searchParams.get("tokens");
+      const fields = url.searchParams.get("fields") || undefined;
+
+      if (!tokensParam) {
+        return Response.json({ error: "Missing tokens parameter" }, { status: 400 });
+      }
+
+      const tokens = tokensParam.split(",").map(t => t.trim()).filter(Boolean);
+
+      if (tokens.length > APP_CONFIG.BATCH.maxSize) {
+        return Response.json({ error: `Batch size exceeds limit of ${APP_CONFIG.BATCH.maxSize}` }, { status: 400 });
+      }
+
+      const submissions = await Promise.all(
+        tokens.map(async (token) => {
+          try {
+            return await this.submissionService.getSubmission(token, fields, base64Encoded);
+          } catch (e) {
+            return { token, error: "Not Found" };
+          }
+        })
+      );
+
+      return Response.json({ submissions });
     } catch (error) {
       return this.handleError(error);
     }
@@ -86,4 +154,3 @@ export class SubmissionController {
     );
   }
 }
-

@@ -1,5 +1,5 @@
 import { getSandbox, Sandbox } from "@cloudflare/sandbox";
-import { EXECUTION_CONFIG } from "../config/execution";
+import { APP_CONFIG } from "../config/appConfig";
 import { normalizeToUtf8String } from "./encoding";
 
 export interface SandboxExecutionParams {
@@ -41,7 +41,7 @@ export async function executeInSandbox(
   sandboxBinding: DurableObjectNamespace<Sandbox>
 ): Promise<SandboxExecutionResult> {
   const { submissionId, sourceCode, command, sourceFile, stdin = "", options, limits } = params;
-  const WORKSPACE_DIR = EXECUTION_CONFIG.workspace;
+  const WORKSPACE_DIR = APP_CONFIG.SYSTEM.workspace;
 
   const sandbox = getSandbox(sandboxBinding, `submission-${submissionId}`);
 
@@ -98,13 +98,49 @@ export async function executeInSandbox(
     throw new Error("Execution command is empty.");
   }
 
+  // Security: Construct the command with resource limits and network isolation
+  // BUT: Don't apply ulimit during compilation as it can cause timeouts
+  const limitCmds: string[] = [];
+
+  if (limits && !params.isCompilation) {
+    // CPU time limit (seconds) - Soft limit
+    if (limits.cpuTimeLimit) limitCmds.push(`ulimit -t ${Math.ceil(limits.cpuTimeLimit)}`);
+    // Virtual memory limit (KB) - DISABLED: Too restrictive for Node.js/Java/Python which need large virtual address spaces
+    // if (limits.memoryLimit) limitCmds.push(`ulimit -v ${limits.memoryLimit}`);
+    // File size limit (blocks)
+    if (limits.maxFileSize) limitCmds.push(`ulimit -f ${Math.ceil(limits.maxFileSize)}`);
+    // Note: ulimit -u (max processes) is not supported in all shells, so we skip it
+  }
+
+  let wrappedCommand = fullCommand;
+
+  // Apply limits if any
+  if (limitCmds.length > 0) {
+    wrappedCommand = `${limitCmds.join(" && ")} && ${wrappedCommand}`;
+  }
+
+  // Network Isolation
+  // If network is NOT enabled AND network isolation is enabled in config, use unshare -n
+  if (!options?.enableNetwork && APP_CONFIG.SYSTEM.enableNetworkIsolation) {
+    wrappedCommand = `unshare -n -- sh -c "${wrappedCommand.replace(/"/g, '\\"')}"`;
+  }
+
   let stdinFilePath: string | null = null;
-  let execCommand = fullCommand;
+  let execCommand: string;
 
   if (stdin) {
-    stdinFilePath = `${WORKSPACE_DIR}/${EXECUTION_CONFIG.stdinFilePrefix}${submissionId}-${crypto.randomUUID()}.txt`;
+    stdinFilePath = `${WORKSPACE_DIR}/${APP_CONFIG.SYSTEM.stdinFilePrefix}${submissionId}-${crypto.randomUUID()}.txt`;
     await sandbox.writeFile(stdinFilePath, normalizeToUtf8String(stdin));
-    execCommand = `${fullCommand} < ${stdinFilePath}`;
+
+    // Wrap everything in a shell to properly handle stdin redirection with ulimit
+    // The ulimit commands need to be in the same shell as the execution
+    if (limitCmds.length > 0) {
+      execCommand = `sh -c '${limitCmds.join(" && ")} && ${fullCommand.replace(/'/g, "'\\''")} < ${stdinFilePath}'`;
+    } else {
+      execCommand = `${fullCommand} < ${stdinFilePath}`;
+    }
+  } else {
+    execCommand = wrappedCommand;
   }
 
   try {
@@ -170,7 +206,6 @@ export async function executeInSandbox(
       startedAt: new Date(),
       finishedAt: new Date(),
     };
-  } 
- 
-}
+  }
 
+}

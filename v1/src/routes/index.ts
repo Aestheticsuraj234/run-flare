@@ -39,6 +39,14 @@ export function setupRoutes(env: Env): Router {
     statusController.list(req, env)
   );
 
+  router.add("POST", "/api/v1/submissions/batch", (req, env, ctx) =>
+    submissionController.createBatch(req, env)
+  );
+
+  router.add("GET", "/api/v1/submissions/batch", (req, env, ctx) =>
+    submissionController.getBatch(req, env)
+  );
+
   router.add("POST", "/api/v1/submissions", (req, env, ctx) =>
     submissionController.create(req, env)
   );
