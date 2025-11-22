@@ -2,6 +2,7 @@ import { Router } from "../lib/router";
 import { SubmissionController } from "../controllers/SubmissionController";
 import { LanguageController } from "../controllers/LanguageController";
 import { StatusController } from "../controllers/StatusController";
+import { WebSocketController } from "../controllers/WebSocketController";
 import { SubmissionService } from "../services/SubmissionService";
 import { ValidationService } from "../services/ValidationService";
 import { SubmissionRepository } from "../repositories/SubmissionRepository";
@@ -29,6 +30,7 @@ export function setupRoutes(env: Env): Router {
   const submissionController = new SubmissionController(submissionService);
   const languageController = new LanguageController(languageRepo);
   const statusController = new StatusController(statusRepo);
+  const webSocketController = new WebSocketController(submissionRepo);
 
   // Register routes
   router.add("GET", "/api/v1/languages", (req, env, ctx) =>
@@ -49,6 +51,11 @@ export function setupRoutes(env: Env): Router {
 
   router.add("POST", "/api/v1/submissions", (req, env, ctx) =>
     submissionController.create(req, env)
+  );
+
+  // WebSocket route - must come before the generic :token route
+  router.add("GET", "/api/v1/submissions/:token/ws", (req, env, ctx, params) =>
+    webSocketController.connect(req, params, env)
   );
 
   router.add("GET", "/api/v1/submissions/:token", (req, env, ctx, params) =>
