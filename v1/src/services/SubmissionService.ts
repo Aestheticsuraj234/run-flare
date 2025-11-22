@@ -2,8 +2,7 @@ import { CreateSubmissionBody } from "../types/types";
 import { SubmissionRepository } from "../repositories/SubmissionRepository";
 import { LanguageRepository } from "../repositories/LanguageRepository";
 import { ValidationService } from "./ValidationService";
-import { DEFAULT_SUBMISSION_LIMITS } from "../config/limits";
-import { STATUS_IDS } from "../config/execution";
+import { APP_CONFIG, STATUS_IDS } from "../config/appConfig";
 import { parseAdditionalFilesPayload, hasNonUtf8Characters } from "../utils/encoding";
 
 export interface SubmissionDTO {
@@ -30,7 +29,7 @@ export class SubmissionService {
     private languageRepo: LanguageRepository,
     private validationService: ValidationService,
     private queue: Queue<any>
-  ) {}
+  ) { }
 
   async createSubmission(
     body: CreateSubmissionBody,
@@ -83,16 +82,16 @@ export class SubmissionService {
       token,
       statusId: STATUS_IDS.IN_QUEUE,
       userId: body.user_id ?? null,
-      numberOfRuns: body.number_of_runs ?? DEFAULT_SUBMISSION_LIMITS.numberOfRuns,
-      cpuTimeLimit: body.cpu_time_limit ?? DEFAULT_SUBMISSION_LIMITS.cpuTimeLimit,
-      cpuExtraTime: body.cpu_extra_time ?? DEFAULT_SUBMISSION_LIMITS.cpuExtraTime,
-      wallTimeLimit: body.wall_time_limit ?? DEFAULT_SUBMISSION_LIMITS.wallTimeLimit,
-      memoryLimit: body.memory_limit ?? DEFAULT_SUBMISSION_LIMITS.memoryLimit,
-      stackLimit: body.stack_limit ?? DEFAULT_SUBMISSION_LIMITS.stackLimit,
-      maxProcessesAndThreads: body.max_processes_and_or_threads ?? DEFAULT_SUBMISSION_LIMITS.maxProcessesAndThreads,
-      enablePerProcessTimeLimit: body.enable_per_process_and_thread_time_limit ?? DEFAULT_SUBMISSION_LIMITS.enablePerProcessTimeLimit,
-      enablePerProcessMemoryLimit: body.enable_per_process_and_thread_memory_limit ?? DEFAULT_SUBMISSION_LIMITS.enablePerProcessMemoryLimit,
-      maxFileSize: body.max_file_size ?? DEFAULT_SUBMISSION_LIMITS.maxFileSize,
+      numberOfRuns: body.number_of_runs ?? APP_CONFIG.EXECUTION.numberOfRuns,
+      cpuTimeLimit: body.cpu_time_limit ?? APP_CONFIG.EXECUTION.cpuTimeLimit,
+      cpuExtraTime: body.cpu_extra_time ?? APP_CONFIG.EXECUTION.cpuExtraTime,
+      wallTimeLimit: body.wall_time_limit ?? APP_CONFIG.EXECUTION.wallTimeLimit,
+      memoryLimit: body.memory_limit ?? APP_CONFIG.EXECUTION.memoryLimit,
+      stackLimit: body.stack_limit ?? APP_CONFIG.EXECUTION.stackLimit,
+      maxProcessesAndThreads: body.max_processes_and_or_threads ?? APP_CONFIG.EXECUTION.maxProcessesAndThreads,
+      enablePerProcessTimeLimit: body.enable_per_process_and_thread_time_limit ?? APP_CONFIG.EXECUTION.enablePerProcessTimeLimit,
+      enablePerProcessMemoryLimit: body.enable_per_process_and_thread_memory_limit ?? APP_CONFIG.EXECUTION.enablePerProcessMemoryLimit,
+      maxFileSize: body.max_file_size ?? APP_CONFIG.EXECUTION.maxFileSize,
       compilerOptions: body.compiler_options ?? null,
       commandLineArguments: body.command_line_arguments ?? null,
       redirectStderrToStdout: body.redirect_stderr_to_stdout ?? false,
