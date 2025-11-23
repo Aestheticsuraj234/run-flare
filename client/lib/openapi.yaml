@@ -64,28 +64,40 @@ paths:
               $ref: '#/components/schemas/CreateSubmissionRequest'
             examples:
               javascript:
-                summary: JavaScript Hello World
+                summary: JavaScript (Node.js 20)
                 value:
                   source_code: "console.log('Hello, World!');"
-                  language_id: 63
-              python:
-                summary: Python with stdin
+                  language_id: 1
+              typescript:
+                summary: TypeScript (5.3)
                 value:
-                  source_code: "name = input()\nprint(f'Hello, {name}!')"
-                  language_id: 71
-                  stdin: "Alice"
-              cpp_with_limits:
-                summary: C++ with custom limits
+                  source_code: "console.log('Hello, TypeScript!');"
+                  language_id: 2
+              python:
+                summary: Python (3.11)
+                value:
+                  source_code: "print('Hello, Python!')"
+                  language_id: 3
+              java:
+                summary: Java (OpenJDK 17)
+                value:
+                  source_code: |
+                    public class Solution {
+                        public static void main(String[] args) {
+                            System.out.println("Hello, Java!");
+                        }
+                    }
+                  language_id: 4
+              cpp:
+                summary: C++ (GCC 11)
                 value:
                   source_code: |
                     #include <iostream>
                     int main() {
-                        std::cout << "Hello, World!" << std::endl;
+                        std::cout << "Hello, C++!" << std::endl;
                         return 0;
                     }
-                  language_id: 54
-                  cpu_time_limit: 2
-                  memory_limit: 128000
+                  language_id: 5
       responses:
         '201':
           description: Submission created successfully
@@ -227,9 +239,9 @@ paths:
             example:
               submissions:
                 - source_code: "console.log('Test 1');"
-                  language_id: 63
+                  language_id: 1
                 - source_code: "print('Test 2')"
-                  language_id: 71
+                  language_id: 3
       responses:
         '201':
           description: Batch submissions created
@@ -335,16 +347,20 @@ paths:
                     type: array
                     items:
                       $ref: '#/components/schemas/Language'
-              example:
+                example:
                 success: true
                 message: "Languages fetched"
                 data:
-                  - id: 63
-                    name: "JavaScript (Node.js 12.14.0)"
-                  - id: 71
-                    name: "Python (3.8.1)"
-                  - id: 54
-                    name: "C++ (GCC 9.2.0)"
+                  - id: 1
+                    name: "JavaScript (Node.js 20)"
+                  - id: 2
+                    name: "TypeScript (5.3)"
+                  - id: 3
+                    name: "Python (3.11)"
+                  - id: 4
+                    name: "Java (OpenJDK 17)"
+                  - id: 5
+                    name: "C++ (GCC 11)"
         '500':
           $ref: '#/components/responses/InternalError'
 

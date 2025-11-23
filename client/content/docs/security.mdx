@@ -1,0 +1,72 @@
+---
+title: Security & Sandboxing
+description: Learn how Run Flare executes code securely
+---
+
+# Security & Sandboxing
+
+Run Flare takes security seriously. Every code submission is executed in a strictly isolated environment to ensure the safety of our platform and our users.
+
+## Isolation Environment
+
+We use advanced sandboxing technologies to isolate code execution. This prevents malicious code from accessing sensitive system files, network resources, or other users' data.
+
+## Vulnerability Check Example
+
+To demonstrate our security measures, let's try to access a sensitive system file like `/etc/passwd` using Python.
+
+### Attempting to read /etc/passwd
+
+<Tabs items={['Request', 'Response']}>
+  <Tab value="Request">
+    ```json
+    {
+      "language_id": 3,
+      "source_code": "try:\n    with open('/etc/passwd', 'r') as f:\n        print(f.read())\nexcept Exception as e:\n    print(f'Security Blocked: {e}')"
+    }
+    ```
+  </Tab>
+  <Tab value="Response">
+    ```json
+    {
+      "token": "...",
+      "status": {
+        "id": 3,
+        "description": "Accepted"
+      },
+      "stdout": "Security Blocked: [Errno 13] Permission denied: '/etc/passwd'\n",
+      "stderr": null
+    }
+    ```
+  </Tab>
+</Tabs>
+
+As you can see, the sandbox prevents the code from reading the file, raising a `Permission denied` error (or `FileNotFoundError` depending on the specific isolation layer configuration).
+
+## Network Isolation
+
+By default, network access is disabled for all submissions. Any attempt to make external network requests will fail.
+
+<Tabs items={['Request', 'Response']}>
+  <Tab value="Request">
+    ```json
+    {
+      "language_id": 3,
+      "source_code": "import urllib.request\ntry:\n    urllib.request.urlopen('https://google.com')\n    print('Connected')\nexcept Exception as e:\n    print(f'Network Blocked: {e}')"
+    }
+    ```
+  </Tab>
+  <Tab value="Response">
+    ```json
+    {
+      "token": "...",
+      "status": {
+        "id": 3,
+        "description": "Accepted"
+      },
+      "stdout": "Network Blocked: <urlopen error [Errno -3] Temporary failure in name resolution>\n",
+      "stderr": null
+    }
+    ```
+  </Tab>
+</Tabs>

@@ -17,4 +17,49 @@ _openapi:
 
 Submit code for execution. Returns a token that can be used to retrieve results.
 
+## Usage Examples
+
+<Tabs items={['JavaScript', 'TypeScript', 'Python', 'Java', 'C++']}>
+  <Tab value="JavaScript">
+    ```json
+    {
+      "source_code": "console.log('Hello, World!');",
+      "language_id": 1
+    }
+    ```
+  </Tab>
+  <Tab value="TypeScript">
+    ```json
+    {
+      "source_code": "console.log('Hello, TypeScript!');",
+      "language_id": 2
+    }
+    ```
+  </Tab>
+  <Tab value="Python">
+    ```json
+    {
+      "source_code": "print('Hello, Python!')",
+      "language_id": 3
+    }
+    ```
+  </Tab>
+  <Tab value="Java">
+    ```json
+    {
+      "source_code": "public class Solution {\n    public static void main(String[] args) {\n        System.out.println(\"Hello, Java!\");\n    }\n}",
+      "language_id": 4
+    }
+    ```
+  </Tab>
+  <Tab value="C++">
+    ```json
+    {
+      "source_code": "#include <iostream>\nint main() {\n    std::cout << \"Hello, C++!\" << std::endl;\n    return 0;\n}",
+      "language_id": 5
+    }
+    ```
+  </Tab>
+</Tabs>
+
 <APIPage document={"./lib/openapi.yaml"} operations={[{"path":"/api/v1/submissions","method":"post"}]} webhooks={[]} hasHead={false} />
