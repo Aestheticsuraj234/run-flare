@@ -3,6 +3,7 @@ import { SubmissionController } from "../controllers/SubmissionController";
 import { LanguageController } from "../controllers/LanguageController";
 import { StatusController } from "../controllers/StatusController";
 import { WebSocketController } from "../controllers/WebSocketController";
+import { DocsController } from "../controllers/DocsController";
 import { SubmissionService } from "../services/SubmissionService";
 import { ValidationService } from "../services/ValidationService";
 import { SubmissionRepository } from "../repositories/SubmissionRepository";
@@ -31,6 +32,20 @@ export function setupRoutes(env: Env): Router {
   const languageController = new LanguageController(languageRepo);
   const statusController = new StatusController(statusRepo);
   const webSocketController = new WebSocketController(submissionRepo);
+  const docsController = new DocsController();
+
+  // Documentation routes
+  router.add("GET", "/api/v1/docs", (req, env, ctx) =>
+    docsController.serveDocs(req, env)
+  );
+
+  router.add("GET", "/api/v1/docs/openapi.yaml", (req, env, ctx) =>
+    docsController.serveSpec(req, env, "yaml")
+  );
+
+  router.add("GET", "/api/v1/docs/openapi.json", (req, env, ctx) =>
+    docsController.serveSpec(req, env, "json")
+  );
 
   // Register routes
   router.add("GET", "/api/v1/languages", (req, env, ctx) =>

@@ -1,0 +1,711 @@
+openapi: 3.1.0
+info:
+  title: Run-Flare Code Execution API
+  version: 1.0.0
+  description: |
+    A powerful code execution API built on Cloudflare Workers that allows you to execute code in multiple programming languages with real-time status updates via WebSocket.
+    
+    ## Features
+    - Execute code in multiple programming languages
+    - Real-time execution status via WebSocket
+    - Batch submission support
+    - Configurable resource limits (CPU, memory, time)
+    - Support for additional files and custom compiler options
+  contact:
+    name: API Support
+    url: https://github.com/Aestheticsuraj234/run-flare
+  license:
+    name: MIT
+
+servers:
+  - url: https://api.run-flare.com
+    description: Production server
+  - url: http://localhost:8787
+    description: Local development server
+
+tags:
+  - name: Submissions
+    description: Code submission and execution endpoints
+  - name: Languages
+    description: Supported programming languages
+  - name: Statuses
+    description: Execution status information
+  - name: WebSocket
+    description: Real-time submission status updates
+
+paths:
+  /api/v1/submissions:
+    post:
+      tags:
+        - Submissions
+      summary: Create a code submission
+      description: Submit code for execution. Returns a token that can be used to retrieve results.
+      operationId: createSubmission
+      parameters:
+        - name: base64_encoded
+          in: query
+          description: Whether source_code and stdin are base64 encoded
+          required: false
+          schema:
+            type: boolean
+            default: false
+        - name: wait
+          in: query
+          description: Wait for execution to complete before returning
+          required: false
+          schema:
+            type: boolean
+            default: false
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateSubmissionRequest'
+            examples:
+              javascript:
+                summary: JavaScript Hello World
+                value:
+                  source_code: "console.log('Hello, World!');"
+                  language_id: 63
+              python:
+                summary: Python with stdin
+                value:
+                  source_code: "name = input()\nprint(f'Hello, {name}!')"
+                  language_id: 71
+                  stdin: "Alice"
+              cpp_with_limits:
+                summary: C++ with custom limits
+                value:
+                  source_code: |
+                    #include <iostream>
+                    int main() {
+                        std::cout << "Hello, World!" << std::endl;
+                        return 0;
+                    }
+                  language_id: 54
+                  cpu_time_limit: 2
+                  memory_limit: 128000
+      responses:
+        '201':
+          description: Submission created successfully
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/SubmissionTokenResponse'
+                  - $ref: '#/components/schemas/SubmissionResponse'
+              examples:
+                token_only:
+                  summary: Token response (wait=false)
+                  value:
+                    token: "abc123def456"
+                complete_result:
+                  summary: Complete result (wait=true)
+                  value:
+                    token: "abc123def456"
+                    status_id: 3
+                    status:
+                      id: 3
+                      description: "Accepted"
+                    stdout: "Hello, World!\n"
+                    time: "0.023"
+                    memory: 2048
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/v1/submissions/{token}:
+    get:
+      tags:
+        - Submissions
+      summary: Get submission result
+      description: Retrieve the execution result of a submission using its token
+      operationId: getSubmission
+      parameters:
+        - name: token
+          in: path
+          required: true
+          description: Submission token returned from create endpoint
+          schema:
+            type: string
+        - name: base64_encoded
+          in: query
+          description: Whether to return stdout/stderr as base64 encoded
+          required: false
+          schema:
+            type: boolean
+            default: false
+        - name: fields
+          in: query
+          description: Comma-separated list of fields to include in response
+          required: false
+          schema:
+            type: string
+          example: "stdout,stderr,status_id,time"
+      responses:
+        '200':
+          description: Submission result
+          headers:
+            Cache-Control:
+              description: Caching policy (public for completed, no-store for pending)
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubmissionResponse'
+              examples:
+                accepted:
+                  summary: Accepted submission
+                  value:
+                    token: "abc123def456"
+                    status_id: 3
+                    status:
+                      id: 3
+                      description: "Accepted"
+                    stdout: "Hello, World!\n"
+                    stderr: null
+                    time: "0.023"
+                    memory: 2048
+                    compile_output: null
+                pending:
+                  summary: Pending submission
+                  value:
+                    token: "abc123def456"
+                    status_id: 2
+                    status:
+                      id: 2
+                      description: "Processing"
+                runtime_error:
+                  summary: Runtime error
+                  value:
+                    token: "abc123def456"
+                    status_id: 5
+                    status:
+                      id: 5
+                      description: "Runtime Error (NZEC)"
+                    stderr: "Traceback (most recent call last):\n  File \"main.py\", line 1\n    print(1/0)\nZeroDivisionError: division by zero\n"
+                    exit_code: 1
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/v1/submissions/batch:
+    post:
+      tags:
+        - Submissions
+      summary: Create multiple submissions
+      description: Submit multiple code executions in a single request
+      operationId: createBatchSubmissions
+      parameters:
+        - name: base64_encoded
+          in: query
+          description: Whether source_code and stdin are base64 encoded
+          required: false
+          schema:
+            type: boolean
+            default: false
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - submissions
+              properties:
+                submissions:
+                  type: array
+                  maxItems: 20
+                  items:
+                    $ref: '#/components/schemas/CreateSubmissionRequest'
+            example:
+              submissions:
+                - source_code: "console.log('Test 1');"
+                  language_id: 63
+                - source_code: "print('Test 2')"
+                  language_id: 71
+      responses:
+        '201':
+          description: Batch submissions created
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SubmissionTokenResponse'
+              example:
+                - token: "token1"
+                - token: "token2"
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+    get:
+      tags:
+        - Submissions
+      summary: Get multiple submission results
+      description: Retrieve results for multiple submissions
+      operationId: getBatchSubmissions
+      parameters:
+        - name: tokens
+          in: query
+          required: true
+          description: Comma-separated list of submission tokens
+          schema:
+            type: string
+          example: "token1,token2,token3"
+        - name: base64_encoded
+          in: query
+          description: Whether to return stdout/stderr as base64 encoded
+          required: false
+          schema:
+            type: boolean
+            default: false
+        - name: fields
+          in: query
+          description: Comma-separated list of fields to include in response
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Batch submission results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  submissions:
+                    type: array
+                    items:
+                      oneOf:
+                        - $ref: '#/components/schemas/SubmissionResponse'
+                        - type: object
+                          properties:
+                            token:
+                              type: string
+                            error:
+                              type: string
+              example:
+                submissions:
+                  - token: "token1"
+                    status_id: 3
+                    stdout: "Test 1\n"
+                  - token: "token2"
+                    error: "Not Found"
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/v1/languages:
+    get:
+      tags:
+        - Languages
+      summary: Get supported languages
+      description: Retrieve list of all supported programming languages
+      operationId: getLanguages
+      responses:
+        '200':
+          description: List of supported languages
+          headers:
+            Cache-Control:
+              description: Response is cached
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Language'
+              example:
+                success: true
+                message: "Languages fetched"
+                data:
+                  - id: 63
+                    name: "JavaScript (Node.js 12.14.0)"
+                  - id: 71
+                    name: "Python (3.8.1)"
+                  - id: 54
+                    name: "C++ (GCC 9.2.0)"
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/v1/statuses:
+    get:
+      tags:
+        - Statuses
+      summary: Get execution statuses
+      description: Retrieve list of all possible execution statuses
+      operationId: getStatuses
+      responses:
+        '200':
+          description: List of execution statuses
+          headers:
+            Cache-Control:
+              description: Response is cached
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Status'
+              example:
+                - id: 1
+                  description: "In Queue"
+                - id: 2
+                  description: "Processing"
+                - id: 3
+                  description: "Accepted"
+                - id: 4
+                  description: "Wrong Answer"
+                - id: 5
+                  description: "Runtime Error (NZEC)"
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /api/v1/submissions/{token}/ws:
+    get:
+      tags:
+        - WebSocket
+      summary: WebSocket connection for real-time updates
+      description: |
+        Establish a WebSocket connection to receive real-time updates about submission execution.
+        
+        ## Message Types
+        - `connected`: Connection established
+        - `status_update`: Execution status changed
+        - `progress_update`: Progress information during execution
+        - `error`: Error occurred
+        - `ping`: Server ping (client should respond with pong)
+      operationId: connectWebSocket
+      parameters:
+        - name: token
+          in: path
+          required: true
+          description: Submission token
+          schema:
+            type: string
+      responses:
+        '101':
+          description: WebSocket connection established
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+components:
+  schemas:
+    CreateSubmissionRequest:
+      type: object
+      required:
+        - source_code
+        - language_id
+      properties:
+        source_code:
+          type: string
+          description: Source code to execute (base64 encoded if base64_encoded=true)
+        language_id:
+          type: integer
+          description: Programming language ID
+          example: 63
+        stdin:
+          type: string
+          nullable: true
+          description: Standard input for the program
+        expected_output:
+          type: string
+          nullable: true
+          description: Expected output for validation
+        user_id:
+          type: string
+          nullable: true
+          description: User identifier
+        number_of_runs:
+          type: integer
+          description: Number of times to run the program
+          default: 1
+        cpu_time_limit:
+          type: number
+          description: CPU time limit in seconds
+          default: 2
+        cpu_extra_time:
+          type: number
+          description: Extra CPU time allowed
+          default: 0.5
+        wall_time_limit:
+          type: number
+          description: Wall time limit in seconds
+          default: 5
+        memory_limit:
+          type: integer
+          description: Memory limit in kilobytes
+          default: 128000
+        stack_limit:
+          type: integer
+          description: Stack size limit in kilobytes
+          default: 64000
+        max_processes_and_or_threads:
+          type: integer
+          description: Maximum number of processes/threads
+          default: 60
+        enable_per_process_and_thread_time_limit:
+          type: boolean
+          default: false
+        enable_per_process_and_thread_memory_limit:
+          type: boolean
+          default: false
+        max_file_size:
+          type: integer
+          description: Maximum file size in kilobytes
+          default: 1024
+        compiler_options:
+          type: string
+          nullable: true
+          description: Additional compiler options
+        command_line_arguments:
+          type: string
+          nullable: true
+          description: Command line arguments for the program
+        redirect_stderr_to_stdout:
+          type: boolean
+          description: Redirect stderr to stdout
+          default: false
+        callback_url:
+          type: string
+          nullable: true
+          description: URL to POST results when execution completes
+        additional_files:
+          type: string
+          description: Base64 encoded additional files
+        enable_network:
+          type: boolean
+          description: Enable network access during execution
+          default: false
+
+    SubmissionTokenResponse:
+      type: object
+      properties:
+        token:
+          type: string
+          description: Unique submission token
+          example: "abc123def456"
+
+    SubmissionResponse:
+      type: object
+      properties:
+        token:
+          type: string
+          description: Unique submission token
+        status_id:
+          type: integer
+          description: Status ID
+        status:
+          $ref: '#/components/schemas/Status'
+        stdout:
+          type: string
+          nullable: true
+          description: Standard output
+        stderr:
+          type: string
+          nullable: true
+          description: Standard error
+        compile_output:
+          type: string
+          nullable: true
+          description: Compiler output
+        message:
+          type: string
+          nullable: true
+          description: Additional message
+        time:
+          type: string
+          nullable: true
+          description: Execution time in seconds
+        memory:
+          type: integer
+          nullable: true
+          description: Memory used in kilobytes
+        exit_code:
+          type: integer
+          nullable: true
+          description: Program exit code
+
+    Language:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: Language ID
+        name:
+          type: string
+          description: Language name and version
+
+    Status:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: Status ID
+        description:
+          type: string
+          description: Status description
+
+    WebSocketMessage:
+      type: object
+      required:
+        - type
+        - timestamp
+        - token
+      properties:
+        type:
+          type: string
+          enum: [connected, status_update, progress_update, error, ping, pong]
+        timestamp:
+          type: string
+          format: date-time
+        token:
+          type: string
+
+    WebSocketStatusUpdate:
+      allOf:
+        - $ref: '#/components/schemas/WebSocketMessage'
+        - type: object
+          properties:
+            status:
+              type: object
+              properties:
+                id:
+                  type: integer
+                name:
+                  type: string
+                description:
+                  type: string
+            data:
+              type: object
+              properties:
+                stdout:
+                  type: string
+                stderr:
+                  type: string
+                time:
+                  type: string
+                memory:
+                  type: integer
+                compile_output:
+                  type: string
+                exit_code:
+                  type: integer
+                message:
+                  type: string
+
+    WebSocketProgressUpdate:
+      allOf:
+        - $ref: '#/components/schemas/WebSocketMessage'
+        - type: object
+          properties:
+            stage:
+              type: string
+              enum: [compiling, running, evaluating]
+            message:
+              type: string
+
+    WebSocketErrorMessage:
+      allOf:
+        - $ref: '#/components/schemas/WebSocketMessage'
+        - type: object
+          properties:
+            error:
+              type: string
+            details:
+              type: string
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Error message
+        details:
+          type: string
+          description: Additional error details
+
+  responses:
+    BadRequest:
+      description: Bad request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: "Invalid batch format. Expected { submissions: [...] }"
+
+    ValidationError:
+      description: Validation error
+      content:
+        application/json:
+          schema:
+            oneOf:
+              - $ref: '#/components/schemas/Error'
+              - type: object
+                additionalProperties:
+                  type: array
+                  items:
+                    type: string
+          examples:
+            simple_error:
+              summary: Simple error message
+              value:
+                error: "source_code can't be blank"
+            field_errors:
+              summary: Field-specific errors
+              value:
+                source_code: ["source_code can't be blank"]
+                language_id: ["language_id doesn't exist"]
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: "Submission not found"
+
+    InternalError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: "Failed to process submission"
+            details: "Internal error details"
+
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: API key for authentication (if required)
+
+security: []
