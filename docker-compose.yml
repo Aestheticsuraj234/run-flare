@@ -21,8 +21,10 @@ services:
       - "8787:8787"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
+    env_file:
+      - .env
     environment:
-      - DATABASE_URL=${DATABASE_URL}
-      - DIRECT_URL=${DIRECT_URL}
-      # Add other environment variables from .dev.vars or .env here if needed
+      # These will be overridden by .env if present, or you can set them here
+      - DATABASE_URL='prisma+postgres://accelerate.prisma-data.net/?api_key=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqd3RfaWQiOjEsInNlY3VyZV9rZXkiOiJza19GVzRXQmZZWkdva2ZKYnpWcjN5TUMiLCJhcGlfa2V5IjoiMDFLQUFUMUVEVjRSOEs0UTZHWVlaVzk2REMiLCJ0ZW5hbnRfaWQiOiIxMTRjNDIwMDM2YmM5NzQ5YjU3MzlkY2I4ODBlNzlkZWQyZDJkYmMxYjMwZDM1MmNhNDk1NmE2MjE3ZTljYjAwIiwiaW50ZXJuYWxfc2VjcmV0IjoiNTA4MjNjMDctYzc5Yi00NDc0LTk0MjMtMmFiM2UxNGQ4NzRkIn0.0KJVsdbNGDlNWQUEmLSUajWlP_vH6Dv_85-S1YNat6I'
+      - DIRECT_URL='http://localhost:8787'
     restart: always

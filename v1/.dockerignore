@@ -1,0 +1,8 @@
+Dockerfile
+Dockerfile.worker
+.dockerignore
+node_modules
+npm-debug.log
+README.md
+.git
+.wrangler

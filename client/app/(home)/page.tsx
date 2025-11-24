@@ -6,7 +6,7 @@ export default function HomePage() {
       {/* Hero Section */}
       <section className="flex flex-col items-center justify-center flex-1 px-4 py-24 text-center space-y-8">
         <div className="space-y-4 max-w-3xl">
-          <h1 className="text-4xl sm:text-6xl font-bold tracking-tight bg-gradient-to-b from-foreground to-muted-foreground bg-clip-text text-transparent">
+          <h1 className="text-4xl sm:text-6xl font-bold tracking-tight bg-linear-to-b from-foreground to-muted-foreground bg-clip-text text-transparent">
             Secure, Scalable Code Execution Engine
           </h1>
           <p className="text-lg sm:text-xl text-muted-foreground max-w-2xl mx-auto">
@@ -18,7 +18,7 @@ export default function HomePage() {
         <div className="flex flex-wrap items-center justify-center gap-4">
           <Link
             href="/docs"
-            className="inline-flex h-10 items-center justify-center rounded-md bg-primary px-8 text-sm font-medium text-primary-foreground shadow transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50"
+            className="inline-flex h-10 items-center border justify-center rounded-md bg-primary px-8 text-sm font-medium text-primary-foreground shadow transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50"
           >
             Get Started
           </Link>
