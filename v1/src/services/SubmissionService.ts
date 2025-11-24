@@ -98,6 +98,7 @@ export class SubmissionService {
       callbackUrl: body.callback_url ?? null,
       additionalFiles: additionalFilesRaw ? (typeof Buffer !== "undefined" ? Buffer.from(additionalFilesRaw, "base64") : null) : null,
       enableNetwork: body.enable_network ?? false,
+      testCases: body.test_cases ?? undefined,
       queuedAt: new Date(),
     });
 
@@ -109,6 +110,7 @@ export class SubmissionService {
       languageId: submission.languageId,
       stdin: submission.stdin,
       expectedOutput: submission.expectedOutput,
+      test_cases: body.test_cases, // Pass test cases to queue
       language: {
         id: language.id,
         name: language.name,

@@ -16,7 +16,7 @@ export interface CompilationResult {
   exitCode?: number;
 }
 
-export interface ExecutionResult extends SandboxExecutionResult {}
+export interface ExecutionResult extends SandboxExecutionResult { }
 
 export interface EvaluationResult {
   statusId: typeof STATUS_IDS[keyof typeof STATUS_IDS];
@@ -24,7 +24,7 @@ export interface EvaluationResult {
 }
 
 export class ExecutionService {
-  constructor(private sandboxBinding: DurableObjectNamespace<Sandbox>) {}
+  constructor(private sandboxBinding: DurableObjectNamespace<Sandbox>) { }
 
   async compileIfNeeded(
     submissionId: string,
@@ -89,6 +89,98 @@ export class ExecutionService {
       results.push(result);
     }
     return results;
+  }
+
+  async executeTestCases(
+    submissionId: string,
+    sourceCode: string,
+    language: Language,
+    testCases: { stdin: string; expected_output?: string }[],
+    limits: any,
+    options: any
+  ): Promise<{ results: ExecutionResult[]; evaluation: EvaluationResult }> {
+    const results: ExecutionResult[] = [];
+
+    // Execute test cases in parallel (or with controlled concurrency)
+    // Since we are in a single sandbox, we can run them sequentially to avoid resource contention
+    // or parallel if the sandbox supports it. For now, let's do sequential to be safe with resources,
+    // but we avoid the overhead of creating new submissions/sandboxes.
+    // Actually, the user wants performance. Parallel execution in the same sandbox might be tricky 
+    // if they share files. But standard stdin/stdout should be fine if we use different file paths for stdin.
+    // Let's try parallel execution with Promise.all for maximum speed.
+
+    const promises = testCases.map(async (testCase, index) => {
+      return executeInSandbox(
+        {
+          submissionId: `${submissionId}-${index}`, // Unique ID for each test case execution
+          sourceCode,
+          command: language.runCmd,
+          sourceFile: language.sourceFile,
+          stdin: testCase.stdin ?? "",
+          limits,
+          options,
+          isCompilation: false,
+        },
+        this.sandboxBinding
+      );
+    });
+
+    const executionResults = await Promise.all(promises);
+
+    // Evaluate each result
+    let allPassed = true;
+    let firstFailedResult: EvaluationResult | null = null;
+    let totalTime = 0;
+    let maxMemory = 0;
+
+    const testResults = executionResults.map((result, index) => {
+      const expected = testCases[index].expected_output;
+      const evalResult = this.evaluateResults(result, expected ?? null);
+
+      if (evalResult.statusId !== STATUS_IDS.ACCEPTED && allPassed) {
+        allPassed = false;
+        firstFailedResult = evalResult;
+      }
+
+      totalTime += result.time;
+      maxMemory = Math.max(maxMemory, result.memory);
+
+      return {
+        ...result,
+        statusId: evalResult.statusId,
+        message: evalResult.message,
+        expectedOutput: expected,
+      };
+    });
+
+    // Aggregate overall result
+    const overallStatus = allPassed
+      ? { statusId: STATUS_IDS.ACCEPTED, message: "Accepted" }
+      : firstFailedResult!;
+
+    // Create a summary execution result
+    const summaryResult: ExecutionResult = {
+      stdout: "", // We don't aggregate stdout for batch
+      stderr: "",
+      exitCode: allPassed ? 0 : 1,
+      exitSignal: null,
+      time: totalTime, // Sum of times? Or max time? Usually sum for total resource usage, but wall time is max.
+      // User cares about "taking a lot of time", so wall time is important.
+      // But for "time limit exceeded" on a problem, it's usually per test case.
+      // Let's report the average or sum? 
+      // The `aggregateResults` method does average. Let's stick to that for consistency if we return a single result.
+      // But here we return a list.
+      memory: maxMemory,
+      wallTime: Math.max(...executionResults.map(r => r.wallTime)),
+      timeLimitExceeded: executionResults.some(r => r.timeLimitExceeded),
+      startedAt: executionResults[0]?.startedAt ?? new Date(),
+      finishedAt: executionResults[executionResults.length - 1]?.finishedAt ?? new Date(),
+    };
+
+    return {
+      results: testResults,
+      evaluation: overallStatus,
+    };
   }
 
   aggregateResults(runResults: ExecutionResult[]): ExecutionResult {

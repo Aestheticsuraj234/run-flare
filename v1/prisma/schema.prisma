@@ -68,6 +68,8 @@ model Submission {
   redirectStderrToStdout Boolean  @default(false)
   callbackUrl          String?
   additionalFiles      Bytes?
+  testCases            Json?
+  testResults          Json?
   enableNetwork        Boolean    @default(false)
   startedAt            DateTime?
   updatedAt            DateTime?

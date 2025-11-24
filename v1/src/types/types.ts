@@ -20,6 +20,7 @@ export interface CreateSubmissionBody {
   callback_url?: string | null;
   additional_files?: string;  // base64 encoded string
   enable_network?: boolean;
+  test_cases?: { stdin: string; expected_output?: string }[];
 }
 
 // WebSocket Message Types

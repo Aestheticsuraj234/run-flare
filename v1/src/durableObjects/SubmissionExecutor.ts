@@ -111,24 +111,51 @@ export class SubmissionExecutor {
         message: "Executing code...",
       });
 
-      const numberOfRuns = options?.numberOfRuns ?? 1;
-      const runResults = await this.executionService.executeRuns(
-        String(submissionId),
-        sourceCode,
-        language,
-        stdin ?? "",
-        numberOfRuns,
-        limits,
-        options
-      );
+      let executionResult: any;
+      let evaluation: any;
+      let testResults: any = undefined;
 
-      // Aggregate results
-      const executionResult = this.executionService.aggregateResults(runResults);
+      if (data.test_cases && Array.isArray(data.test_cases) && data.test_cases.length > 0) {
+        // Batch execution
+        const batchResult = await this.executionService.executeTestCases(
+          String(submissionId),
+          sourceCode,
+          language,
+          data.test_cases,
+          limits,
+          options
+        );
+        executionResult = {
+          ...batchResult.results[0], // Use first result for basic stats, but override with summary
+          time: batchResult.results.reduce((acc, r) => acc + r.time, 0), // Total CPU time
+          wallTime: Math.max(...batchResult.results.map(r => r.wallTime)), // Max wall time
+          memory: Math.max(...batchResult.results.map(r => r.memory)), // Max memory
+          stdout: "", // No single stdout
+          stderr: "", // No single stderr
+        };
+        evaluation = batchResult.evaluation;
+        testResults = batchResult.results;
+      } else {
+        // Standard single/multi-run execution
+        const numberOfRuns = options?.numberOfRuns ?? 1;
+        const runResults = await this.executionService.executeRuns(
+          String(submissionId),
+          sourceCode,
+          language,
+          stdin ?? "",
+          numberOfRuns,
+          limits,
+          options
+        );
 
-      // Step 4: Evaluate & update DB
-      const evaluation = this.executionService.evaluateResults(executionResult, expectedOutput);
+        // Aggregate results
+        executionResult = this.executionService.aggregateResults(runResults);
 
-      await this.submissionRepo.updateWithResults(String(submissionId), evaluation, executionResult);
+        // Step 4: Evaluate & update DB
+        evaluation = this.executionService.evaluateResults(executionResult, expectedOutput);
+      }
+
+      await this.submissionRepo.updateWithResults(String(submissionId), evaluation, executionResult, testResults);
 
       // Broadcast completion status
       const submission = await this.submissionRepo.findByToken(token);
@@ -185,7 +212,6 @@ export class SubmissionExecutor {
         finishedAt: new Date(),
       });
     }
-
   }
 
   private async broadcastWebSocketUpdate(

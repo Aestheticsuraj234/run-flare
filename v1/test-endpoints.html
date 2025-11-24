@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>v1 API Endpoints Tester</title>
+  <style>
+    body{font-family:Segoe UI,Arial;background:#f6f8fb;color:#0b1220;padding:18px}
+    .row{display:flex;gap:12px;align-items:flex-start}
+    label{font-weight:600;font-size:13px}
+    select,input,textarea,button{font-family:inherit;font-size:13px}
+    textarea{width:100%;min-height:200px}
+    .panel{background:#fff;border:1px solid #e2e8f0;padding:12px;border-radius:8px}
+    .small{font-size:12px;color:#475569}
+    pre{background:#0f1724;color:#e6eef8;padding:12px;border-radius:6px;overflow:auto}
+  </style>
+</head>
+<body>
+  <h2>v1 API Endpoints Tester</h2>
+  <div class="panel">
+    <div class="row">
+      <div style="flex:1">
+        <label>Base URL</label>
+        <input id="baseUrl" value="http://localhost:8787" style="width:100%" />
+        <div class="small">Change to your running worker/HTTP server base (include schema and host:port).</div>
+      </div>
+      <div style="width:320px">
+        <label>Endpoint</label>
+        <select id="endpointSelect" style="width:100%"></select>
+        <div class="small">Select an endpoint to auto-fill method, path and sample body.</div>
+      </div>
+    </div>
+
+    <div style="margin-top:12px" class="row">
+      <div style="flex:1">
+        <label>URL (editable)</label>
+        <input id="url" style="width:100%" />
+      </div>
+      <div style="width:160px">
+        <label>Method</label>
+        <input id="method" readonly style="width:100%" />
+      </div>
+      <div style="width:140px">
+        <label>Content-Type</label>
+        <input id="contentType" value="application/json" style="width:100%" />
+      </div>
+    </div>
+
+    <div style="margin-top:12px" class="row">
+      <div style="flex:1">
+        <label>Request Body (JSON)</label>
+        <textarea id="body"></textarea>
+      </div>
+      <div style="width:380px">
+        <label>Actions</label>
+        <div style="display:flex;gap:8px;margin-top:6px">
+          <button id="sendBtn">Send Request</button>
+          <button id="openWsBtn">Open WebSocket (if selected)</button>
+          <button id="prettyBtn">Format JSON</button>
+          <button id="clearBtn">Clear Response</button>
+        </div>
+        <div style="margin-top:12px">
+          <label>Notes</label>
+          <div class="small panel" style="height:210px;overflow:auto">
+            - Use <code>/api/v1/languages</code> to discover valid <code>language_id</code> values.<br/>
+            - For batch operations use <code>{ "submissions": [ ... ] }</code>.<br/>
+            - WebSocket URL will be converted from HTTP base (http -> ws, https -> wss).
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div style="margin-top:12px">
+      <label>Response</label>
+      <pre id="response">No response yet.</pre>
+    </div>
+  </div>
+
+  <script>
+    const endpoints = [
+      { name: 'List Languages', method: 'GET', path: '/api/v1/languages', sampleBody: '' },
+      { name: 'List Statuses', method: 'GET', path: '/api/v1/statuses', sampleBody: '' },
+      { name: 'Create Submission', method: 'POST', path: '/api/v1/submissions', sampleBody: JSON.stringify({
+        source_code: "print('hello world')",
+        language_id: 1,
+        stdin: null,
+        expected_output: null,
+        user_id: null,
+        number_of_runs: 1,
+        cpu_time_limit: 1,
+        memory_limit: 256000000,
+        compiler_options: null,
+        command_line_arguments: null,
+        redirect_stderr_to_stdout: true,
+        callback_url: null,
+        enable_network: false,
+        test_cases: [{ stdin: "", expected_output: "" }]
+      }, null, 2) },
+      { name: 'Create Batch', method: 'POST', path: '/api/v1/submissions/batch', sampleBody: JSON.stringify({
+        submissions: [
+          {
+            source_code: "print(\"hello\")",
+            language_id: 1
+          },
+          {
+            source_code: "print(\"batch 2\")",
+            language_id: 1
+          }
+        ]
+      }, null, 2) },
+      { name: 'Get Submission', method: 'GET', path: '/api/v1/submissions/:token', sampleBody: '' },
+      { name: 'Get Batch (by tokens)', method: 'GET', path: '/api/v1/submissions/batch?tokens=token1,token2', sampleBody: '' },
+      { name: 'WebSocket (connect)', method: 'WS', path: '/api/v1/submissions/:token/ws', sampleBody: '' }
+    ];
+
+    const select = document.getElementById('endpointSelect');
+    const urlInput = document.getElementById('url');
+    const baseInput = document.getElementById('baseUrl');
+    const methodInput = document.getElementById('method');
+    const bodyInput = document.getElementById('body');
+    const contentType = document.getElementById('contentType');
+    const resp = document.getElementById('response');
+
+    endpoints.forEach((e,i)=>{
+      const opt = document.createElement('option');opt.value = i;opt.textContent = e.name;select.appendChild(opt);
+    });
+
+    function applyEndpoint(i){
+      const e = endpoints[i];
+      methodInput.value = e.method;
+      const base = baseInput.value.replace(/\/+$/,'');
+      let url = base + e.path;
+      urlInput.value = url;
+      bodyInput.value = e.sampleBody || '';
+    }
+
+    select.addEventListener('change', ()=> applyEndpoint(select.value));
+    baseInput.addEventListener('change', ()=> applyEndpoint(select.value));
+
+    document.getElementById('sendBtn').addEventListener('click', async ()=>{
+      resp.textContent = 'Sending...';
+      try{
+        const method = methodInput.value;
+        const url = urlInput.value;
+        const headers = {};
+        const opts = { method };
+        if (method !== 'GET' && method !== 'DELETE' && method !== 'WS'){
+          headers['Content-Type'] = contentType.value || 'application/json';
+          opts.body = bodyInput.value;
+        }
+        opts.headers = headers;
+        const r = await fetch(url, opts);
+        const text = await r.text();
+        let parsed = text;
+        try{ parsed = JSON.stringify(JSON.parse(text), null, 2); }catch(e){}
+        resp.textContent = `Status: ${r.status} ${r.statusText}\n\nHeaders:\n` + [...r.headers.entries()].map(h=>h.join(': ')).join('\n') + '\n\nBody:\n' + parsed;
+      }catch(err){
+        resp.textContent = 'Request failed: '+ String(err);
+      }
+    });
+
+    document.getElementById('openWsBtn').addEventListener('click', ()=>{
+      const url = urlInput.value;
+      if(!url) return alert('URL missing');
+      // convert http(s) to ws(s)
+      let wsUrl = url.replace(/^http:/i,'ws:').replace(/^https:/i,'wss:');
+      try{
+        const ws = new WebSocket(wsUrl);
+        resp.textContent = 'WebSocket: connecting...';
+        ws.onopen = ()=> resp.textContent += '\nOPEN';
+        ws.onmessage = (m)=> resp.textContent += '\nMSG: '+ m.data;
+        ws.onerror = (e)=> resp.textContent += '\nERROR';
+        ws.onclose = (c)=> resp.textContent += `\nCLOSE code=${c.code}`;
+      }catch(e){
+        resp.textContent = 'WebSocket error: '+ String(e);
+      }
+    });
+
+    document.getElementById('prettyBtn').addEventListener('click', ()=>{
+      try{ const j = JSON.parse(bodyInput.value); bodyInput.value = JSON.stringify(j, null, 2); }catch(e){ alert('Invalid JSON'); }
+    });
+
+    document.getElementById('clearBtn').addEventListener('click', ()=>{ resp.textContent = 'No response yet.'; });
+
+    // select first endpoint by default
+    select.selectedIndex = 0; applyEndpoint(0);
+  </script>
+</body>
+</html>

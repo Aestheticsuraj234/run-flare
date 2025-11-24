@@ -26,6 +26,7 @@ export interface CreateSubmissionData {
   callbackUrl?: string | null;
   additionalFiles?: Buffer | null;
   enableNetwork?: boolean;
+  testCases?: any;
   queuedAt: Date;
 }
 
@@ -78,7 +79,8 @@ export class SubmissionRepository {
   async updateWithResults(
     id: string,
     evaluation: { statusId: number; message: string | null },
-    executionResult: any
+    executionResult: any,
+    testResults?: any
   ) {
     return prisma.submission.update({
       where: { id },
@@ -92,6 +94,7 @@ export class SubmissionRepository {
         memory: executionResult.memory,
         wallTime: executionResult.wallTime,
         message: evaluation.message,
+        testResults: testResults ?? undefined,
         finishedAt: new Date(),
         updatedAt: new Date(),
       },
