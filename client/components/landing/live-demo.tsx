@@ -236,7 +236,7 @@ int main() {
 
 // Helper function to get WebSocket URL
 const getWebSocketUrl = (token: string): string => {
-    return `ws://localhost:8787/api/v1/submissions/${token}/ws`;
+    return `wss://v1.jhapriya458.workers.dev/api/v1/submissions/${token}/ws`;
 };
 
 // API helper functions
