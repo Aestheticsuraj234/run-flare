@@ -17,6 +17,7 @@ const DEFAULT_CORS_CONFIG: CorsConfig = {
         'http://localhost:8787',
         'http://127.0.0.1:3000',
         'http://127.0.0.1:8787',
+        'https://run-flare.vercel.app'
     ],
     allowedMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
