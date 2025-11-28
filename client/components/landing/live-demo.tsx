@@ -305,6 +305,7 @@ export function LiveDemo() {
 
     // Refs for cleanup
     const wsRef = useRef<WebSocket | null>(null);
+    const wsRefsMap = useRef<Map<string, WebSocket>>(new Map());
     const pollingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
     // Cleanup function
@@ -313,6 +314,10 @@ export function LiveDemo() {
             wsRef.current.close();
             wsRef.current = null;
         }
+        // Close all batch WebSocket connections
+        wsRefsMap.current.forEach(ws => ws.close());
+        wsRefsMap.current.clear();
+
         if (pollingTimeoutRef.current) {
             clearTimeout(pollingTimeoutRef.current);
             pollingTimeoutRef.current = null;
@@ -390,9 +395,30 @@ export function LiveDemo() {
                 const response = await fetch(
                     `${API_BASE_URL}/submissions/batch?tokens=${tokenString}`
                 );
-                if (allFinished) {
-                    setIsRunning(false);
-                    return;
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: Failed to fetch batch submission status`);
+                }
+
+                const result = await response.json();
+                const batchData = result.data || result;
+
+                // Update results with the fetched data
+                if (Array.isArray(batchData)) {
+                    setResults(prev => {
+                        return prev.map(prevResult => {
+                            const updatedData = batchData.find((d: any) => d.token === prevResult.token);
+                            return updatedData ? { ...prevResult, ...updatedData } : prevResult;
+                        });
+                    });
+
+                    // Check if all submissions are finished
+                    const allFinished = batchData.every((d: any) => d.status?.id >= PROCESSING_STATUS_ID);
+
+                    if (allFinished) {
+                        setIsRunning(false);
+                        return;
+                    }
                 }
 
                 // Continue polling
@@ -409,7 +435,7 @@ export function LiveDemo() {
         };
 
         await poll();
-    }, [testCases]);
+    }, []);
 
     const connectWebSocket = useCallback((token: string) => {
         const wsUrl = getWebSocketUrl(token);
@@ -459,6 +485,66 @@ export function LiveDemo() {
         };
     }, [updateResult, pollSubmission]);
 
+    const connectBatchWebSockets = useCallback((tokens: string[]) => {
+        let finishedCount = 0;
+        const totalCount = tokens.length;
+
+        tokens.forEach(token => {
+            const wsUrl = getWebSocketUrl(token);
+            const ws = new WebSocket(wsUrl);
+            wsRefsMap.current.set(token, ws);
+
+            ws.onopen = () => {
+                console.log(`WebSocket connected for token: ${token}`);
+            };
+
+            ws.onmessage = (event) => {
+                try {
+                    const msg = JSON.parse(event.data);
+
+                    if (msg.type === "status_update" || msg.type === "connected") {
+                        const data = msg.data || {};
+                        updateResult(token, {
+                            status: msg.status || data.status,
+                            stdout: data.stdout,
+                            stderr: data.stderr,
+                            compile_output: data.compile_output,
+                            time: data.time,
+                            memory: data.memory,
+                        });
+
+                        // Check if this submission finished
+                        const statusId = msg.status?.id || data.status?.id;
+                        if (statusId && statusId >= PROCESSING_STATUS_ID) {
+                            finishedCount++;
+                            ws.close();
+                            wsRefsMap.current.delete(token);
+
+                            // Check if all submissions are finished
+                            if (finishedCount >= totalCount) {
+                                setIsRunning(false);
+                            }
+                        }
+                    }
+                } catch (err) {
+                    console.error(`Failed to parse WebSocket message for token ${token}:`, err);
+                }
+            };
+
+            ws.onerror = (e) => {
+                console.error(`WebSocket error for token ${token}:`, e);
+                ws.close();
+                wsRefsMap.current.delete(token);
+                // Fallback to polling for this specific token
+                pollSubmission(token);
+            };
+
+            ws.onclose = () => {
+                wsRefsMap.current.delete(token);
+            };
+        });
+    }, [updateResult, pollSubmission]);
+
     const runSingle = useCallback(async (mode: "polling" | "websocket") => {
         const stdin = testCases.length > 0 ? testCases[0].stdin : "";
         const expectedOutput = testCases.length > 0 ? testCases[0].expected_output : undefined;
@@ -479,7 +565,7 @@ export function LiveDemo() {
         }
     }, [code, languageId, testCases, connectWebSocket, pollSubmission]);
 
-    const runBatch = useCallback(async () => {
+    const runBatch = useCallback(async (mode: "polling" | "websocket") => {
         if (testCases.length === 0) {
             throw new Error("Add at least one test case for batch execution");
         }
@@ -495,18 +581,24 @@ export function LiveDemo() {
             }))
         );
 
-        await pollBatch(tokens);
-    }, [code, languageId, testCases, pollBatch]);
+        if (mode === "websocket") {
+            connectBatchWebSockets(tokens);
+        } else {
+            await pollBatch(tokens);
+        }
+    }, [code, languageId, testCases, pollBatch, connectBatchWebSockets]);
 
-    const handleRun = useCallback(async (mode: "polling" | "websocket" | "batch") => {
+    const handleRun = useCallback(async (mode: "polling" | "websocket" | "batch-polling" | "batch-websocket") => {
         cleanup(); // Clean up any existing connections
         setIsRunning(true);
         setResults([]);
         setError(null);
 
         try {
-            if (mode === "batch") {
-                await runBatch();
+            if (mode === "batch-polling") {
+                await runBatch("polling");
+            } else if (mode === "batch-websocket") {
+                await runBatch("websocket");
             } else {
                 await runSingle(mode);
             }

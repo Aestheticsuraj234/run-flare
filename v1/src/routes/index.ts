@@ -1,11 +1,14 @@
 import { Router } from "../lib/router";
+
 import { SubmissionController } from "../controllers/SubmissionController";
 import { LanguageController } from "../controllers/LanguageController";
 import { StatusController } from "../controllers/StatusController";
 import { WebSocketController } from "../controllers/WebSocketController";
 import { DocsController } from "../controllers/DocsController";
+
 import { SubmissionService } from "../services/SubmissionService";
 import { ValidationService } from "../services/ValidationService";
+
 import { SubmissionRepository } from "../repositories/SubmissionRepository";
 import { LanguageRepository } from "../repositories/LanguageRepository";
 import { StatusRepository } from "../repositories/StatusRepository";

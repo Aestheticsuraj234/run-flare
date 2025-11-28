@@ -164,7 +164,7 @@ export class SubmissionExecutor {
           type: "status_update",
           timestamp: new Date().toISOString(),
           token,
-          status: { id: submission.statusId, name: submission.status.name, description: submission.status.description },
+          status: { id: submission.statusId, name: submission.status.name, description: submission?.status?.description! },
           data: {
             stdout: executionResult.stdout ?? "",
             stderr: executionResult.stderr ?? "",

@@ -24,7 +24,7 @@ interface SubmissionControlsProps {
     languageId: number;
     setLanguageId: (id: number) => void;
     isRunning: boolean;
-    onRun: (mode: string) => void;
+    onRun: (mode: "polling" | "websocket" | "batch-polling" | "batch-websocket") => void;
     submissionMode: "single" | "batch";
     setSubmissionMode: (mode: "single" | "batch") => void;
 }
@@ -110,15 +110,27 @@ export default function SubmissionControls({
                         </Button>
                     </>
                 ) : (
-                    <Button
-                        size="sm"
-                        onClick={() => onRun("batch")}
-                        disabled={isRunning}
-                        className="gap-2"
-                    >
-                        {isRunning ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Layers className="w-4 h-4" />}
-                        Run Batch
-                    </Button>
+                    <>
+                        <Button
+                            size="sm"
+                            onClick={() => onRun("batch-polling")}
+                            disabled={isRunning}
+                            className="gap-2"
+                            variant="outline"
+                        >
+                            {isRunning ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Layers className="w-4 h-4" />}
+                            Batch (Poll)
+                        </Button>
+                        <Button
+                            size="sm"
+                            onClick={() => onRun("batch-websocket")}
+                            disabled={isRunning}
+                            className="gap-2"
+                        >
+                            {isRunning ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Activity className="w-4 h-4" />}
+                            Batch (WS)
+                        </Button>
+                    </>
                 )}
             </div>
         </div>
