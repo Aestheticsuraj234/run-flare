@@ -1,23 +1,16 @@
 import { WebSocketStatusUpdate, WebSocketProgressUpdate, WebSocketErrorMessage, WebSocketConnectedMessage } from "../types/types";
+import { DurableObject } from "cloudflare:workers";
 
-interface WebSocketClient {
-    webSocket: WebSocket;
-    connectedAt: number;
-}
-
-export class SubmissionWebSocket {
-    private state: DurableObjectState;
-    private clients: Map<string, WebSocketClient>;
+export class SubmissionWebSocket extends DurableObject<Env> {
     private token: string;
 
-    constructor(state: DurableObjectState, env: Env) {
-        this.state = state;
-        this.clients = new Map();
+    constructor(ctx: DurableObjectState, env: Env) {
+        super(ctx, env);
         this.token = "";
 
         // Restore state if needed
-        this.state.blockConcurrencyWhile(async () => {
-            const storedToken = await this.state.storage.get<string>("token");
+        this.ctx.blockConcurrencyWhile(async () => {
+            const storedToken = await this.ctx.storage.get<string>("token");
             if (storedToken) {
                 this.token = storedToken;
             }
@@ -51,40 +44,17 @@ export class SubmissionWebSocket {
         // Store token if not already set
         if (!this.token) {
             this.token = token;
-            await this.state.storage.put("token", token);
+            await this.ctx.storage.put("token", token);
         }
 
         // Create WebSocket pair
         const pair = new WebSocketPair();
         const [client, server] = Object.values(pair);
 
-        // Accept the WebSocket connection
-        server.accept();
+        // Accept the WebSocket connection using Hibernation API
+        this.ctx.acceptWebSocket(server);
 
-        // Generate unique client ID
-        const clientId = crypto.randomUUID();
-
-        // Store client
-        this.clients.set(clientId, {
-            webSocket: server,
-            connectedAt: Date.now(),
-        });
-
-        // Set up event handlers
-        server.addEventListener("message", (event) => {
-            this.handleWebSocketMessage(clientId, event);
-        });
-
-        server.addEventListener("close", () => {
-            this.handleWebSocketClose(clientId);
-        });
-
-        server.addEventListener("error", (event) => {
-            console.error(`[WebSocket] Error for client ${clientId}:`, event);
-            this.handleWebSocketClose(clientId);
-        });
-
-        // Send connected message
+        // Send connected message immediately
         const connectedMessage: WebSocketConnectedMessage = {
             type: "connected",
             timestamp: new Date().toISOString(),
@@ -93,7 +63,7 @@ export class SubmissionWebSocket {
         };
         server.send(JSON.stringify(connectedMessage));
 
-        console.log(`[WebSocket] Client ${clientId} connected to submission ${this.token}. Total clients: ${this.clients.size}`);
+        console.log(`[WebSocket] Client connected to submission ${this.token}.`);
 
         return new Response(null, {
             status: 101,
@@ -101,32 +71,35 @@ export class SubmissionWebSocket {
         });
     }
 
-    private handleWebSocketMessage(clientId: string, event: MessageEvent) {
+    async webSocketMessage(ws: WebSocket, message: string | ArrayBuffer) {
         try {
-            const message = JSON.parse(event.data as string);
+            const msg = JSON.parse(message as string);
 
             // Handle ping/pong
-            if (message.type === "ping") {
-                const client = this.clients.get(clientId);
-                if (client) {
-                    client.webSocket.send(JSON.stringify({ type: "pong", timestamp: new Date().toISOString() }));
-                }
+            if (msg.type === "ping") {
+                ws.send(JSON.stringify({ type: "pong", timestamp: new Date().toISOString() }));
             }
         } catch (error) {
-            console.error(`[WebSocket] Error parsing message from client ${clientId}:`, error);
+            console.error(`[WebSocket] Error parsing message:`, error);
         }
     }
 
-    private handleWebSocketClose(clientId: string) {
-        this.clients.delete(clientId);
-        console.log(`[WebSocket] Client ${clientId} disconnected. Remaining clients: ${this.clients.size}`);
+    async webSocketClose(ws: WebSocket, code: number, reason: string, wasClean: boolean) {
+        console.log(`[WebSocket] Client disconnected. Code: ${code}, Reason: ${reason}`);
+    }
+
+    async webSocketError(ws: WebSocket, error: unknown) {
+        console.error(`[WebSocket] Error:`, error);
     }
 
     private async handleBroadcastRequest(request: Request): Promise<Response> {
         try {
             const message = await request.json() as WebSocketStatusUpdate | WebSocketProgressUpdate | WebSocketErrorMessage;
             this.broadcast(message);
-            return new Response(JSON.stringify({ success: true, clientCount: this.clients.size }), {
+
+            // Get client count efficiently
+            const clients = this.ctx.getWebSockets();
+            return new Response(JSON.stringify({ success: true, clientCount: clients.length }), {
                 headers: { "Content-Type": "application/json" },
             });
         } catch (error) {
@@ -140,43 +113,22 @@ export class SubmissionWebSocket {
 
     private broadcast(message: WebSocketStatusUpdate | WebSocketProgressUpdate | WebSocketErrorMessage) {
         const messageStr = JSON.stringify(message);
+        const websockets = this.ctx.getWebSockets();
+
         let successCount = 0;
         let failureCount = 0;
 
-        for (const [clientId, client] of this.clients.entries()) {
+        for (const ws of websockets) {
             try {
-                client.webSocket.send(messageStr);
+                ws.send(messageStr);
                 successCount++;
             } catch (error) {
-                console.error(`[WebSocket] Failed to send to client ${clientId}:`, error);
+                console.error(`[WebSocket] Failed to send to client:`, error);
                 failureCount++;
-                // Remove failed client
-                this.clients.delete(clientId);
+                // Hibernation API handles cleanup automatically on error/close
             }
         }
 
         console.log(`[WebSocket] Broadcast to ${successCount} clients (${failureCount} failures). Message type: ${message.type}`);
-    }
-
-    // Cleanup stale connections (called periodically via alarm)
-    async alarm() {
-        const now = Date.now();
-        const maxAge = 60 * 60 * 1000; // 1 hour
-
-        for (const [clientId, client] of this.clients.entries()) {
-            if (now - client.connectedAt > maxAge) {
-                try {
-                    client.webSocket.close(1000, "Connection timeout");
-                } catch (error) {
-                    console.error(`[WebSocket] Error closing stale connection ${clientId}:`, error);
-                }
-                this.clients.delete(clientId);
-            }
-        }
-
-        // Schedule next cleanup if there are still clients
-        if (this.clients.size > 0) {
-            await this.state.storage.setAlarm(Date.now() + 5 * 60 * 1000); // 5 minutes
-        }
     }
 }

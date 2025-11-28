@@ -3,7 +3,9 @@ import { SubmissionExecutor } from "./durableObjects/SubmissionExecutor";
 import { Sandbox } from "./durableObjects/Sandbox";
 import { SubmissionWebSocket } from "./durableObjects/SubmissionWebSocket";
 
-export { SubmissionExecutor, Sandbox, SubmissionWebSocket };
+import { RateLimiter } from "./durableObjects/RateLimiter";
+
+export { SubmissionExecutor, Sandbox, SubmissionWebSocket, RateLimiter };
 
 import { rateLimiter } from "./middleware/rateLimiter";
 import { errorHandler } from "./middleware/errorHandler";
