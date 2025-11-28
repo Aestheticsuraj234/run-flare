@@ -8,13 +8,13 @@ import { type ButtonProps, buttonVariants } from './ui/button';
 
 interface SearchToggleProps
   extends Omit<ComponentProps<'button'>, 'color'>,
-    ButtonProps {
+  ButtonProps {
   hideIfDisabled?: boolean;
 }
 
 export function SearchToggle({
   hideIfDisabled,
-  size = 'icon-sm',
+
   color = 'ghost',
   ...props
 }: SearchToggleProps) {
@@ -25,10 +25,7 @@ export function SearchToggle({
     <button
       type="button"
       className={cn(
-        buttonVariants({
-          size,
-          color,
-        }),
+
         props.className,
       )}
       data-search=""

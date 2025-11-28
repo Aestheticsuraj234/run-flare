@@ -25,8 +25,8 @@ export function Navbar({
         'fixed flex flex-col top-(--fd-banner-height) left-0 right-(--removed-body-scroll-bar-size,0) z-10 px-(--fd-layout-offset) h-(--fd-nav-height) backdrop-blur-sm transition-colors',
         (!isTransparent || open) && 'bg-fd-background/80',
         mode === 'auto' &&
-          !collapsed &&
-          'ps-[calc(var(--fd-layout-offset)+var(--fd-sidebar-width))]',
+        !collapsed &&
+        'ps-[calc(var(--fd-layout-offset)+var(--fd-sidebar-width))]',
         props.className,
       )}
     >
@@ -70,8 +70,8 @@ export function NavbarSidebarTrigger({
       {...props}
       className={cn(
         buttonVariants({
-          color: 'ghost',
-          size: 'icon-sm',
+
+
           className,
         }),
       )}

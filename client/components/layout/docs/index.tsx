@@ -81,7 +81,7 @@ export interface DocsLayoutProps extends BaseLayoutProps {
 
 interface SidebarOptions
   extends ComponentProps<'aside'>,
-    Pick<SidebarProps, 'defaultOpenLevel' | 'prefetch'> {
+  Pick<SidebarProps, 'defaultOpenLevel' | 'prefetch'> {
   components?: Partial<SidebarComponents>;
 
   /**
@@ -141,20 +141,20 @@ export function DocsLayout(props: DocsLayoutProps) {
       typeof banner === 'function'
         ? banner
         : (props: ComponentProps<typeof SidebarHeader>) => (
-            <SidebarHeader {...props}>
-              {props.children}
-              {banner}
-            </SidebarHeader>
-          );
+          <SidebarHeader {...props}>
+            {props.children}
+            {banner}
+          </SidebarHeader>
+        );
     const Footer =
       typeof footer === 'function'
         ? footer
         : (props: ComponentProps<typeof SidebarFooter>) => (
-            <SidebarFooter {...props}>
-              {props.children}
-              {footer}
-            </SidebarFooter>
-          );
+          <SidebarFooter {...props}>
+            {props.children}
+            {footer}
+          </SidebarFooter>
+        );
     const iconLinks = links.filter((item) => item.type === 'icon');
 
     const rootToggle = (
@@ -207,8 +207,6 @@ export function DocsLayout(props: DocsLayoutProps) {
                 <SidebarCollapseTrigger
                   className={cn(
                     buttonVariants({
-                      color: 'ghost',
-                      size: 'icon-sm',
                       className: 'mt-px mb-auto text-fd-muted-foreground',
                     }),
                   )}
@@ -234,8 +232,7 @@ export function DocsLayout(props: DocsLayoutProps) {
               item={item}
               className={cn(
                 buttonVariants({
-                  size: 'icon-sm',
-                  color: 'ghost',
+
                   className: 'lg:hidden',
                 }),
               )}
@@ -254,8 +251,7 @@ export function DocsLayout(props: DocsLayoutProps) {
           <SidebarTrigger
             className={cn(
               buttonVariants({
-                size: 'icon-sm',
-                color: 'ghost',
+
                 className: 'ms-auto text-fd-muted-foreground',
               }),
             )}
@@ -277,10 +273,7 @@ export function DocsLayout(props: DocsLayoutProps) {
               key={i}
               item={item}
               className={cn(
-                buttonVariants({
-                  size: 'icon-sm',
-                  color: 'ghost',
-                }),
+
                 'text-fd-muted-foreground lg:hidden',
                 i === iconLinks.length - 1 && 'me-auto',
               )}
@@ -376,10 +369,7 @@ function DocsNavbar({
           {sidebarCollapsible && navMode === 'auto' && (
             <SidebarCollapseTrigger
               className={cn(
-                buttonVariants({
-                  color: 'ghost',
-                  size: 'icon-sm',
-                }),
+
                 'text-fd-muted-foreground data-[collapsed=false]:hidden max-md:hidden',
               )}
             >
@@ -437,7 +427,6 @@ function DocsNavbar({
                 key={i}
                 item={item}
                 className={cn(
-                  buttonVariants({ size: 'icon-sm', color: 'ghost' }),
                   'text-fd-muted-foreground max-lg:hidden',
                 )}
                 aria-label={item.label}
@@ -467,10 +456,7 @@ function DocsNavbar({
             {sidebarCollapsible && navMode === 'top' && (
               <SidebarCollapseTrigger
                 className={cn(
-                  buttonVariants({
-                    color: 'secondary',
-                    size: 'icon-sm',
-                  }),
+
                   'text-fd-muted-foreground rounded-full -me-1.5',
                 )}
               >
