@@ -143,9 +143,9 @@ export function DocsPage({
       toc={
         tocEnabled || tocPopoverEnabled
           ? {
-              toc,
-              single: tocOptions.single,
-            }
+            toc,
+            single: tocOptions.single,
+          }
           : false
       }
       {...container}
@@ -196,11 +196,6 @@ export function EditOnGitHub(props: ComponentProps<'a'>) {
       rel="noreferrer noopener"
       {...props}
       className={cn(
-        buttonVariants({
-          color: 'secondary',
-          size: 'sm',
-          className: 'gap-1.5 not-prose',
-        }),
         props.className,
       )}
     >
