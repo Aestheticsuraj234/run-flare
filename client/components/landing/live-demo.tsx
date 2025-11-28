@@ -7,7 +7,7 @@ import SubmissionControls, { LANGUAGES } from "./submission-controls";
 import { OutputDisplay, ExecutionResult } from "./output-display";
 
 // Constants
-const API_BASE_URL = "http://localhost:8787/api/v1";
+const API_BASE_URL = "https://v1.jhapriya458.workers.dev/api/v1";
 const POLLING_INTERVAL = 1000;
 const MAX_POLLING_RETRIES = 20;
 const PROCESSING_STATUS_ID = 3; // Status IDs >= 3 are final states
