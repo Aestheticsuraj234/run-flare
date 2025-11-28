@@ -3,6 +3,7 @@
 
 import { forwardRef, useEffect, useState } from "react";
 import Editor from "react-simple-code-editor";
+// @ts-ignore
 import Prism from "prismjs";
 import "prismjs/components/prism-javascript";
 import "prismjs/components/prism-python";

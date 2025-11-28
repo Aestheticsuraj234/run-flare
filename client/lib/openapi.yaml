@@ -18,7 +18,7 @@ info:
     name: MIT
 
 servers:
-  - url: http://localhost:8787
+  - url: https://v1.jhapriya458.workers.dev
     description: Production server
   - url: http://localhost:8787
     description: Local development server
