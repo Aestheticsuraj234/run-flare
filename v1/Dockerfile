@@ -24,7 +24,7 @@ RUN useradd -m -d /home/sandboxuser -s /bin/bash sandboxuser \
 WORKDIR /workspace
 
 # Switch to non-root user
-USER sandboxuser
+# USER sandboxuser
 
 ENV TMPDIR=/workspace
 

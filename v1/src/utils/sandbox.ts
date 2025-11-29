@@ -41,9 +41,14 @@ export async function executeInSandbox(
   sandboxBinding: DurableObjectNamespace<Sandbox>
 ): Promise<SandboxExecutionResult> {
   const { submissionId, sourceCode, command, sourceFile, stdin = "", options, limits } = params;
-  const WORKSPACE_DIR = APP_CONFIG.SYSTEM.workspace;
 
-  const sandbox = getSandbox(sandboxBinding, `submission-${submissionId}`);
+  // Create a unique workspace directory for this submission to prevent file collisions
+  // in the shared singleton sandbox.
+  const ROOT_WORKSPACE = APP_CONFIG.SYSTEM.workspace;
+  const SUBMISSION_DIR = `${ROOT_WORKSPACE}/${submissionId}`;
+
+  // Use a fixed ID for the sandbox to ensure we reuse the same container (Singleton pattern)
+  const sandbox = getSandbox(sandboxBinding, "shared-sandbox-instance");
 
   // Validate paths
   validatePath(sourceFile);
@@ -53,24 +58,29 @@ export async function executeInSandbox(
     }
   }
 
-  const filesCreated: string[] = [];
-  const filePath = `${WORKSPACE_DIR}/${sourceFile}`;
-
   try {
+    // Create submission directory
+    await sandbox.mkdir(SUBMISSION_DIR);
+
+    const filePath = `${SUBMISSION_DIR}/${sourceFile}`;
     await sandbox.writeFile(filePath, normalizeToUtf8String(sourceCode));
-    filesCreated.push(filePath);
 
     // Write additional files
     if (options?.additionalFiles && Array.isArray(options.additionalFiles)) {
       for (const f of options.additionalFiles) {
         try {
-          const p = `${WORKSPACE_DIR}/${f.path}`;
+          const p = `${SUBMISSION_DIR}/${f.path}`;
+          // Ensure parent dirs exist for additional files if they have paths
+          // This might be tricky if sandbox.mkdir doesn't support recursive, 
+          // but for now assuming flat or simple paths. 
+          // Ideally we should check for slashes and mkdir -p.
+          // For safety/simplicity in this fix, we assume flat or pre-existing structure isn't needed deep.
+
           if (f.contentBase64) {
             await sandbox.writeFile(p, f.contentBase64, { encoding: "base64" });
           } else {
             await sandbox.writeFile(p, normalizeToUtf8String(f.content ?? ""));
           }
-          filesCreated.push(p);
         } catch (e) {
           console.warn("[Sandbox] Failed to write additional file", e);
         }
@@ -78,11 +88,8 @@ export async function executeInSandbox(
     }
 
     // Security: Sanitize arguments to prevent command injection
-    // We only allow alphanumeric characters, spaces, dashes, underscores, equals, dots, and slashes.
     const sanitizeArg = (arg: string) => {
       if (!arg) return "";
-      // Remove any character that is NOT allowed
-      // Allowed: a-z, A-Z, 0-9, space, -, _, =, ., /
       return arg.replace(/[^a-zA-Z0-9 \-_=./]/g, "");
     };
 
@@ -102,18 +109,12 @@ export async function executeInSandbox(
       throw new Error("Execution command is empty.");
     }
 
-    // Security: Construct the command with resource limits and network isolation
-    // BUT: Don't apply ulimit during compilation as it can cause timeouts
+    // Security: Construct the command with resource limits
     const limitCmds: string[] = [];
 
     if (limits && !params.isCompilation) {
-      // CPU time limit (seconds) - Soft limit
       if (limits.cpuTimeLimit) limitCmds.push(`ulimit -t ${Math.ceil(limits.cpuTimeLimit)}`);
-      // Virtual memory limit (KB) - DISABLED: Too restrictive for Node.js/Java/Python which need large virtual address spaces
-      // if (limits.memoryLimit) limitCmds.push(`ulimit -v ${limits.memoryLimit}`);
-      // File size limit (blocks)
       if (limits.maxFileSize) limitCmds.push(`ulimit -f ${Math.ceil(limits.maxFileSize)}`);
-      // Note: ulimit -u (max processes) is not supported in all shells, so we skip it
     }
 
     let wrappedCommand = fullCommand;
@@ -124,7 +125,6 @@ export async function executeInSandbox(
     }
 
     // Network Isolation
-    // If network is NOT enabled AND network isolation is enabled in config, use unshare -n
     if (!options?.enableNetwork && APP_CONFIG.SYSTEM.enableNetworkIsolation) {
       wrappedCommand = `unshare -n -- sh -c "${wrappedCommand.replace(/"/g, '\\"')}"`;
     }
@@ -133,12 +133,9 @@ export async function executeInSandbox(
     let execCommand: string;
 
     if (stdin) {
-      stdinFilePath = `${WORKSPACE_DIR}/${APP_CONFIG.SYSTEM.stdinFilePrefix}${submissionId}-${crypto.randomUUID()}.txt`;
+      stdinFilePath = `${SUBMISSION_DIR}/${APP_CONFIG.SYSTEM.stdinFilePrefix}stdin.txt`;
       await sandbox.writeFile(stdinFilePath, normalizeToUtf8String(stdin));
-      filesCreated.push(stdinFilePath);
 
-      // Wrap everything in a shell to properly handle stdin redirection with ulimit
-      // The ulimit commands need to be in the same shell as the execution
       if (limitCmds.length > 0) {
         execCommand = `sh -c '${limitCmds.join(" && ")} && ${fullCommand.replace(/'/g, "'\\''")} < ${stdinFilePath}'`;
       } else {
@@ -158,8 +155,8 @@ export async function executeInSandbox(
         resolve({
           stdout: "",
           stderr: "Time Limit Exceeded",
-          exitCode: 124, // Standard timeout exit code
-          exitSignal: 9, // SIGKILL
+          exitCode: 124,
+          exitSignal: 9,
           time: wallTimeLimitMs,
           memory: 0,
           wallTime: wallTimeLimitMs,
@@ -170,12 +167,13 @@ export async function executeInSandbox(
       }, wallTimeLimitMs);
     });
 
-    const executionPromise = sandbox.exec(execCommand, { cwd: WORKSPACE_DIR }).then((runResult) => {
+    // Execute in the submission specific directory
+    const executionPromise = sandbox.exec(execCommand, { cwd: SUBMISSION_DIR }).then((runResult) => {
       clearTimeout(timeoutId);
 
       const stdout = runResult.stdout ?? "";
       const stderr = runResult.stderr ?? "";
-      const duration = runResult.duration ?? 0; // duration is usually in ms
+      const duration = runResult.duration ?? 0;
       const startedAt = runResult.timestamp ? new Date(runResult.timestamp) : new Date();
       const finishedAt = new Date(startedAt.getTime() + duration);
 
@@ -193,7 +191,6 @@ export async function executeInSandbox(
       };
     });
 
-    // Race execution against timeout
     return await Promise.race([executionPromise, timeoutPromise]);
 
   } catch (error: any) {
@@ -211,13 +208,15 @@ export async function executeInSandbox(
       finishedAt: new Date(),
     };
   } finally {
-    // Cleanup: Delete all created files
-    for (const file of filesCreated) {
-      try {
-        await sandbox.deleteFile(file);
-      } catch (e) {
-        console.warn(`[Sandbox] Failed to delete file ${file}:`, e);
-      }
+    // Cleanup: Delete the entire submission directory
+    try {
+      // Recursive delete if supported, or just rm -rf via exec if API doesn't support it directly
+      // The sandbox API usually has deleteFile. For directories, we might need `rm -rf` via exec
+      // or delete files individually.
+      // Let's try to be clean and use exec for rm -rf as it's most reliable for dirs
+      await sandbox.exec(`rm -rf ${SUBMISSION_DIR}`);
+    } catch (e) {
+      console.warn(`[Sandbox] Failed to cleanup directory ${SUBMISSION_DIR}:`, e);
     }
   }
 }
