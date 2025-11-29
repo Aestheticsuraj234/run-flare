@@ -13,14 +13,11 @@ export default function Layout({ children }: LayoutProps<'/'>) {
   return (
     <html lang="en" className={poppins.className} suppressHydrationWarning>
       <body className="flex flex-col min-h-screen ">
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="system"
-          enableSystem
-          disableTransitionOnChange
-        >
-          <RootProvider >{children}</RootProvider>
-        </ThemeProvider>
+
+        <RootProvider >
+
+          {children}</RootProvider>
+
       </body>
     </html>
   );

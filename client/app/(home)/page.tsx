@@ -8,9 +8,10 @@ export default function HomePage() {
       <section className="flex flex-col items-center justify-center px-4 py-20 sm:py-24 text-center space-y-8">
         <div className="space-y-4 max-w-3xl">
           <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold tracking-tight">
-            <span className="bg-gradient-to-b from-foreground to-foreground/60 bg-clip-text text-transparent">
+            <span className="bg-gradient-to-r from-amber-400 via-amber-500 to-orange-500 bg-clip-text text-transparent font-bold">
               Secure, Scalable Code Execution Engine
             </span>
+
           </h1>
           <p className="text-base sm:text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto">
             Execute code in multiple languages with real-time updates and isolated sandboxing.
