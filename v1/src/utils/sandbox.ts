@@ -93,7 +93,15 @@ export async function executeInSandbox(
       return arg.replace(/[^a-zA-Z0-9 \-_=./]/g, "");
     };
 
-    const segments = [command?.trim()];
+    // Helper to strip absolute workspace paths from commands
+    // This ensures compatibility if the DB still has absolute paths like /workspace/solution.py
+    const stripWorkspacePath = (cmd: string | null | undefined) => {
+      if (!cmd) return "";
+      return cmd.replace(new RegExp(`${ROOT_WORKSPACE}/`, 'g'), './')
+        .replace(new RegExp(`${ROOT_WORKSPACE}`, 'g'), '.');
+    };
+
+    const segments = [stripWorkspacePath(command?.trim())];
 
     if (options?.compilerOptions) {
       segments.push(sanitizeArg(options.compilerOptions.trim()));
