@@ -97,8 +97,12 @@ export async function executeInSandbox(
     // This ensures compatibility if the DB still has absolute paths like /workspace/solution.py
     const stripWorkspacePath = (cmd: string | null | undefined) => {
       if (!cmd) return "";
-      return cmd.replace(new RegExp(`${ROOT_WORKSPACE}/`, 'g'), './')
-        .replace(new RegExp(`${ROOT_WORKSPACE}`, 'g'), '.');
+      // Strip both /workspace and ROOT_WORKSPACE paths and replace with relative paths
+      return cmd
+        .replace(new RegExp(`${ROOT_WORKSPACE}/`, 'g'), './')
+        .replace(new RegExp(`${ROOT_WORKSPACE}`, 'g'), '.')
+        .replace(/\/workspace\//g, './')
+        .replace(/\/workspace/g, '.');
     };
 
     const segments = [stripWorkspacePath(command?.trim())];
