@@ -97,12 +97,25 @@ export async function executeInSandbox(
     // This ensures compatibility if the DB still has absolute paths like /workspace/solution.py
     const stripWorkspacePath = (cmd: string | null | undefined) => {
       if (!cmd) return "";
-      // Strip both /workspace and ROOT_WORKSPACE paths and replace with relative paths
-      return cmd
-        .replace(new RegExp(`${ROOT_WORKSPACE}/`, 'g'), './')
-        .replace(new RegExp(`${ROOT_WORKSPACE}`, 'g'), '.')
-        .replace(/\/workspace\//g, './')
-        .replace(/\/workspace/g, '.');
+
+      let result = cmd;
+
+      // First, replace absolute workspace paths with just the filename
+      // Handle cases like: /workspace/solution.py or /workspace/./solution.py
+      result = result.replace(/\/workspace\/\.?\//g, '');
+      result = result.replace(/\/workspace\//g, '');
+      result = result.replace(/\/workspace/g, '');
+
+      // Also handle the ROOT_WORKSPACE config value
+      const escapedRoot = ROOT_WORKSPACE.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      result = result.replace(new RegExp(`${escapedRoot}/\\.?/`, 'g'), '');
+      result = result.replace(new RegExp(`${escapedRoot}/`, 'g'), '');
+      result = result.replace(new RegExp(escapedRoot, 'g'), '');
+
+      // Clean up any remaining ./ at the start
+      result = result.replace(/^\.\/+/, '');
+
+      return result;
     };
 
     const segments = [stripWorkspacePath(command?.trim())];
