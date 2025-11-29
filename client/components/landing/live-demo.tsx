@@ -7,7 +7,7 @@ import SubmissionControls, { LANGUAGES } from "./submission-controls";
 import { OutputDisplay, ExecutionResult } from "./output-display";
 
 // Constants
-const API_BASE_URL = "https://v1.jhapriya458.workers.dev/api/v1";
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8787/api/v1";
 const POLLING_INTERVAL = 1000;
 const MAX_POLLING_RETRIES = 20;
 const PROCESSING_STATUS_ID = 3; // Status IDs >= 3 are final states
@@ -236,7 +236,8 @@ int main() {
 
 // Helper function to get WebSocket URL
 const getWebSocketUrl = (token: string): string => {
-    return `wss://v1.jhapriya458.workers.dev/api/v1/submissions/${token}/ws`;
+    const wsUrl = process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:8787/api/v1";
+    return `${wsUrl}/submissions/${token}/ws`;
 };
 
 // API helper functions
